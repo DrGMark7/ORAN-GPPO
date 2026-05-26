@@ -39,7 +39,7 @@ class TrainingAnimator:
         output_path: str = None,
         fps: int = 10,
         gif_workers: int | None = None,
-        max_frames: int = 300,
+        max_frames: int = 100,
     ):
         with open(json_path, "r", encoding="utf-8") as file_obj:
             results = json.load(file_obj)
