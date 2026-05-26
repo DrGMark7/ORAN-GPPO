@@ -55,6 +55,7 @@ Train the agent:
 ```bash
 python train.py --episodes 100 --device cpu --benchmark small
 python train.py --episodes 100 --device cpu --benchmark large
+python train.py --episodes 100 --device cpu --benchmark large --paper-episode-length
 ```
 
 These are project benchmark settings:
@@ -72,6 +73,7 @@ Generate animations:
 
 ```bash
 python main.py animate
+python main.py animate --episode-trace-path outputs/episode_traces/train_small_balanced_train_a_episode_000.json
 ```
 
 Use the convenience launcher:
@@ -100,7 +102,13 @@ Training writes artifacts to:
 - `outputs/training_results.json`
 - `outputs/gppo_policy.pt`
 
-`training_results.json` includes policy-derived diagnostics such as split usage, per-episode cost breakdowns, per-topology evaluation summaries, and GNN training verification.
+`training_results.json` includes policy-derived diagnostics such as split usage, per-time-slot reconfiguration changes, per-episode cost breakdowns, per-topology evaluation summaries, and GNN training verification.
+
+Evaluation also exports per-episode paper-style traces to:
+
+- `outputs/episode_traces/*.json`
+
+Each trace contains the slot-by-slot orchestration history for one evaluated episode, including split/ES/RC decisions, validity, costs, reconfiguration changes, and a compact episode summary.
 
 Visualization commands write plots to:
 
@@ -117,17 +125,25 @@ Animation commands write assets to:
 
 - `animations/01_learning_progress.mp4`
 - `animations/02_reward_landscape.png`
-- `animations/03_network_state.mp4`
+- `animations/03_episode_evolution.mp4`
+- `animations/04_network_state.mp4`
 
 ## Core Components
 
-- `src/core/environment.py`: O-RAN simulator with topology-pool selection, capacity, and masking logic
+- `src/core/environment.py`: O-RAN simulator with topology-pool selection, per-time-slot split/placement decisions, consecutive-slot reconfiguration cost, capacity, and masking logic
 - `src/core/topologies.py`: project benchmark topology families including balanced, clustered, sparse-backhaul, and direct-heavy variants
 - `src/core/topology_pool.py`: train/test topology pools with `fixed` and `random_per_reset` selection
 - `src/core/gnn.py`: graph builder plus GINE-based graph encoder
 - `src/core/agent.py`: masked PPO policy, rollout storage, and PPO update step
 - `src/workflows/training.py`: benchmark-aware training loop plus per-topology train/test diagnostics
 - `src/visualization/plots.py`: topology, training, cost, and comparison charts
+
+## Paper Time-Slot Semantics
+
+- One environment step corresponds to one paper time slot.
+- At every time slot, each RH re-selects exactly one split, one ES, and one RC for that slot.
+- Reconfiguration cost is computed from decision changes between consecutive time slots.
+- Use `--paper-episode-length` to run the paper-aligned 288 time-slot horizon.
 
 ## Notes
 

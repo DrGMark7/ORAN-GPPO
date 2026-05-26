@@ -1,0 +1,778 @@
+diff --git a/src/core/environment.py b/src/core/environment.py
+index 88e872c..167131a 100644
+--- a/src/core/environment.py
++++ b/src/core/environment.py
+@@ -1,5 +1,6 @@
+ from __future__ import annotations
+ 
++from functools import lru_cache
+ from typing import Dict, List, Optional, Tuple
+ 
+ import gymnasium as gym
+@@ -15,6 +16,9 @@ class SimplifiedORANEnv(gym.Env):
+     """Paper-aligned GPPO baseline environment with controlled topology pools."""
+ 
+     metadata = {"render_modes": ["human"]}
++    EXACT_FEASIBILITY_MAX_RHS = 10
++    BOUNDED_FEASIBILITY_RHS = 8
++    BOUNDED_FEASIBILITY_VISIT_LIMIT = 50_000
+ 
+     def __init__(
+         self,
+@@ -37,8 +41,16 @@ class SimplifiedORANEnv(gym.Env):
+         self.benchmark = benchmark
+         self.topology_pool_name = topology_pool_name
+         self.topology_selection_mode = topology_selection_mode
+-        if constraint_mode not in {"legacy", "strict"}:
+-            raise ValueError("constraint_mode must be 'legacy' or 'strict'")
++        valid_constraint_modes = {
++            "legacy",
++            "strict",
++            "strict_connectivity_only",
++            "strict_connectivity_plus_capacity",
++            "strict_connectivity_plus_capacity_plus_bandwidth",
++            "strict_full",
++        }
++        if constraint_mode not in valid_constraint_modes:
++            raise ValueError(f"constraint_mode must be one of {sorted(valid_constraint_modes)}")
+         self.constraint_mode = constraint_mode
+         self.requested_topology_id = topology_id
+         self.topology_registry = topology_registry or DEFAULT_TOPOLOGY_REGISTRY
+@@ -186,7 +198,10 @@ class SimplifiedORANEnv(gym.Env):
+         self.rc_remaining = np.ones(self.num_rcs, dtype=np.float32) * self.rc_capacity
+         self._sample_requests()
+         feasible_action = self.find_feasible_action(constraint_mode="legacy")
+-        strict_feasible_action = self.find_feasible_action(constraint_mode="strict")
++        greedy_strict_feasible_action = self.find_feasible_action(constraint_mode="strict_full")
++        exact_strict_feasible = self.has_exact_feasible_action(constraint_mode="strict_full")
++        bounded_strict_probe = self.probe_bounded_feasible_action(constraint_mode="strict_full")
++        strict_feasible_exists = exact_strict_feasible if exact_strict_feasible is not None else (greedy_strict_feasible_action is not None)
+         self._refresh_edge_state({})
+         info = {
+             "topology_id": self.topology_id,
+@@ -196,7 +211,10 @@ class SimplifiedORANEnv(gym.Env):
+             "topology_selection_mode": selection.selection_mode,
+             "topology_metadata": dict(self.topology_spec.metadata),
+             "has_structurally_valid_action": feasible_action is not None,
+-            "has_strictly_valid_action": strict_feasible_action is not None,
++            "has_strictly_valid_action": bool(strict_feasible_exists),
++            "has_greedy_strictly_valid_action": greedy_strict_feasible_action is not None,
++            "has_exact_strictly_valid_action": exact_strict_feasible,
++            "bounded_strict_feasibility_probe": bounded_strict_probe,
+         }
+         return self._get_state(), info
+ 
+@@ -345,8 +363,192 @@ class SimplifiedORANEnv(gym.Env):
+         metrics = self._evaluate_action(action, constraint_mode_override=constraint_mode)
+         return action if metrics["valid"] else None
+ 
++    def _constraint_mode_alias(self, constraint_mode: str) -> str:
++        if constraint_mode == "strict":
++            return "strict_full"
++        return constraint_mode
++
++    def _enforced_reason_set(self, constraint_mode: str) -> set[str]:
++        active_mode = self._constraint_mode_alias(constraint_mode)
++        if active_mode in {"legacy", "strict_connectivity_only"}:
++            return set()
++        if active_mode == "strict_connectivity_plus_capacity":
++            return {"es_capacity_exceeded", "rc_capacity_exceeded"}
++        if active_mode == "strict_connectivity_plus_capacity_plus_bandwidth":
++            return {"es_capacity_exceeded", "rc_capacity_exceeded", "bandwidth_exceeded"}
++        if active_mode == "strict_full":
++            return {
++                "es_capacity_exceeded",
++                "rc_capacity_exceeded",
++                "bandwidth_exceeded",
++                "e2e_latency_exceeded",
++                "crosshaul_latency_exceeded",
++            }
++        raise ValueError(f"Unsupported constraint_mode: {constraint_mode}")
++
++    def _candidate_assignments_for_rh(self, rh_idx: int) -> List[Tuple[int, int, int]]:
++        rh_node = f"RH{rh_idx}"
++        candidates: List[Tuple[int, int, int]] = []
++        for split in range(self.split_options):
++            if split == 3:
++                for rc_idx in self._get_direct_rc_options(rh_idx):
++                    candidates.append((split, 0, rc_idx))
++                continue
++            for es_idx in range(self.num_ess):
++                es_node = f"ES{es_idx}"
++                if not self.topology.has_edge(rh_node, es_node):
++                    continue
++                for rc_idx in range(self.num_rcs):
++                    rc_node = f"RC{rc_idx}"
++                    if self.topology.has_edge(es_node, rc_node):
++                        candidates.append((split, es_idx, rc_idx))
++        return candidates
++
++    def _search_feasible_action(
++        self,
++        *,
++        constraint_mode: str,
++        rh_indices: List[int],
++        visit_limit: Optional[int] = None,
++    ) -> Optional[bool]:
++        enforced_reasons = self._enforced_reason_set(constraint_mode)
++        candidate_map = {
++            rh_idx: self._candidate_assignments_for_rh(rh_idx)
++            for rh_idx in rh_indices
++        }
++        if any(not candidate_map[rh_idx] for rh_idx in rh_indices):
++            return False
++
++        order = sorted(rh_indices, key=lambda rh_idx: len(candidate_map[rh_idx]))
++        edge_caps = []
++        edge_index: Dict[Tuple[str, str], int] = {}
++        for idx, (u, v) in enumerate(self.edge_order):
++            edge_key = self._edge_key(u, v)
++            edge_index[edge_key] = idx
++            edge_caps.append(float(self.topology.edges[u, v]["bandwidth"]))
++        visit_count = 0
++
++        @lru_cache(maxsize=None)
++        def dfs(
++            pos: int,
++            es_loads: Tuple[float, ...],
++            rc_loads: Tuple[float, ...],
++            edge_usage: Tuple[float, ...],
++        ) -> bool:
++            nonlocal visit_count
++            visit_count += 1
++            if visit_limit is not None and visit_count > visit_limit:
++                raise RuntimeError("bounded_feasibility_visit_limit_reached")
++            if pos == len(order):
++                return True
++
++            rh_idx = order[pos]
++            demand = float(self.rh_demands[rh_idx])
++            demand_gbps = demand / 1000.0
++            rh_latency = float(self.rh_latencies[rh_idx])
++
++            for split, es_idx, rc_idx in candidate_map[rh_idx]:
++                next_es = list(es_loads)
++                next_rc = list(rc_loads)
++                next_edge = list(edge_usage)
++                invalid_reasons = set()
++
++                if split == 3:
++                    next_rc[rc_idx] += float(self.cu_costs[split] * demand)
++                    if next_rc[rc_idx] > self.rc_capacity + 1e-9:
++                        invalid_reasons.add("rc_capacity_exceeded")
++                    direct_edge = self.topology.edges[f"RH{rh_idx}", f"RC{rc_idx}"]
++                    edge_key = self._edge_key(f"RH{rh_idx}", f"RC{rc_idx}")
++                    edge_idx = edge_index[edge_key]
++                    next_edge[edge_idx] += demand_gbps
++                    if next_edge[edge_idx] > edge_caps[edge_idx] + 1e-9:
++                        invalid_reasons.add("bandwidth_exceeded")
++                    direct_delay = float(direct_edge["delay"])
++                    if direct_delay > rh_latency + 1e-9:
++                        invalid_reasons.add("e2e_latency_exceeded")
++                    if direct_delay > float(self.crosshaul_latency_limits[split]) + 1e-9:
++                        invalid_reasons.add("crosshaul_latency_exceeded")
++                else:
++                    next_es[es_idx] += float(self.du_costs[split] * demand)
++                    next_rc[rc_idx] += float(self.cu_costs[split] * demand)
++                    if next_es[es_idx] > self.es_capacity + 1e-9:
++                        invalid_reasons.add("es_capacity_exceeded")
++                    if next_rc[rc_idx] > self.rc_capacity + 1e-9:
++                        invalid_reasons.add("rc_capacity_exceeded")
++                    edge_key = self._edge_key(f"ES{es_idx}", f"RC{rc_idx}")
++                    edge_idx = edge_index[edge_key]
++                    next_edge[edge_idx] += demand_gbps
++                    if next_edge[edge_idx] > edge_caps[edge_idx] + 1e-9:
++                        invalid_reasons.add("bandwidth_exceeded")
++                    rh_es_edge = self.topology.edges[f"RH{rh_idx}", f"ES{es_idx}"]
++                    es_rc_edge = self.topology.edges[f"ES{es_idx}", f"RC{rc_idx}"]
++                    e2e_delay = float(rh_es_edge["delay"] + es_rc_edge["delay"])
++                    crosshaul_delay = float(es_rc_edge["delay"])
++                    if e2e_delay > rh_latency + 1e-9:
++                        invalid_reasons.add("e2e_latency_exceeded")
++                    if crosshaul_delay > float(self.crosshaul_latency_limits[split]) + 1e-9:
++                        invalid_reasons.add("crosshaul_latency_exceeded")
++
++                if invalid_reasons & enforced_reasons:
++                    continue
++
++                rounded_es = tuple(round(value, 6) for value in next_es)
++                rounded_rc = tuple(round(value, 6) for value in next_rc)
++                rounded_edge = tuple(round(value, 6) for value in next_edge)
++                if dfs(pos + 1, rounded_es, rounded_rc, rounded_edge):
++                    return True
++            return False
++
++        try:
++            return dfs(
++                0,
++                tuple(0.0 for _ in range(self.num_ess)),
++                tuple(0.0 for _ in range(self.num_rcs)),
++                tuple(0.0 for _ in range(len(self.edge_order))),
++            )
++        except RuntimeError as exc:
++            if str(exc) == "bounded_feasibility_visit_limit_reached":
++                return None
++            raise
++
++    def has_exact_feasible_action(self, constraint_mode: str = "strict_full") -> Optional[bool]:
++        if self.num_rhs > self.EXACT_FEASIBILITY_MAX_RHS:
++            return None
++        return self._search_feasible_action(
++            constraint_mode=constraint_mode,
++            rh_indices=list(range(self.num_rhs)),
++            visit_limit=None,
++        )
++
++    def probe_bounded_feasible_action(
++        self,
++        constraint_mode: str = "strict_full",
++        max_rhs: Optional[int] = None,
++        visit_limit: Optional[int] = None,
++    ) -> Dict[str, object]:
++        capped_rhs = min(self.num_rhs, max_rhs or self.BOUNDED_FEASIBILITY_RHS)
++        capped_visit_limit = visit_limit or self.BOUNDED_FEASIBILITY_VISIT_LIMIT
++        result = self._search_feasible_action(
++            constraint_mode=constraint_mode,
++            rh_indices=list(range(capped_rhs)),
++            visit_limit=capped_visit_limit,
++        )
++        return {
++            "result": result,
++            "rhs_considered": int(capped_rhs),
++            "visit_limit": int(capped_visit_limit),
++            "is_full_instance": bool(capped_rhs == self.num_rhs),
++            "is_exact": bool(capped_rhs == self.num_rhs and result is not None and self.num_rhs <= self.EXACT_FEASIBILITY_MAX_RHS),
++            "status": (
++                "exact"
++                if capped_rhs == self.num_rhs and result is not None and self.num_rhs <= self.EXACT_FEASIBILITY_MAX_RHS
++                else "bounded"
++            ),
++        }
++
+     def _evaluate_action(self, action: np.ndarray, constraint_mode_override: Optional[str] = None) -> Dict[str, object]:
+-        active_constraint_mode = constraint_mode_override or self.constraint_mode
++        active_constraint_mode = self._constraint_mode_alias(constraint_mode_override or self.constraint_mode)
++        enforced_reasons = self._enforced_reason_set(active_constraint_mode)
+         splits, es_choices, rc_choices = self._split_action(action)
+         nfail = 0
+         failure_counts = {
+@@ -464,9 +666,9 @@ class SimplifiedORANEnv(gym.Env):
+             failure_counts["crosshaul_latency_exceeded"] = 1
+             invalid_reasons.append("crosshaul_latency_exceeded")
+ 
+-        if active_constraint_mode == "strict" and invalid_reasons:
++        if enforced_reasons.intersection(invalid_reasons):
+             valid = False
+-            nfail += len(invalid_reasons)
++            nfail += len(enforced_reasons.intersection(invalid_reasons))
+ 
+         return {
+             "valid": valid,
+diff --git a/src/workflows/training.py b/src/workflows/training.py
+index 81ffa49..6e99d09 100644
+--- a/src/workflows/training.py
++++ b/src/workflows/training.py
+@@ -55,10 +55,13 @@ def _zero_topology_debug() -> Dict[str, object]:
+     return {
+         "resets": 0,
+         "strictly_valid_resets": 0,
++        "exact_strictly_valid_resets": 0,
+         "steps": 0,
+         "valid_steps": 0,
+         "invalid_reason_events": 0,
+         "invalid_counts_by_reason": _zero_failure_counts(),
++        "first_failing_constraint_counts": {},
++        "bounded_probe_results": [],
+     }
+ 
+ 
+@@ -76,6 +79,39 @@ def _invalid_reason_percentages(
+     }
+ 
+ 
++def _strict_feasibility_wording(
++    exact_values: List[Optional[bool]],
++) -> Dict[str, str]:
++    has_exact = any(value is not None for value in exact_values)
++    if has_exact:
++        return {
++            "rate_label": "Strict-Feasible Reset Rate",
++            "no_action_label": "Episodes With No Strict-Valid Action",
++            "status": "exact_supported",
++        }
++    return {
++        "rate_label": "Strict-Feasible Reset Rate (Current Probe)",
++        "no_action_label": "Episodes With No Strict-Valid Action Found By Current Probe",
++        "status": "probe_only",
++    }
++
++
++def _bounded_probe_summary(probes: List[Dict[str, object]]) -> Dict[str, float]:
++    if not probes:
++        return {
++            "positive_rate": 0.0,
++            "negative_rate": 0.0,
++            "inconclusive_rate": 0.0,
++        }
++    results = [probe.get("result") for probe in probes]
++    total = len(results)
++    return {
++        "positive_rate": _safe_rate(sum(result is True for result in results), total),
++        "negative_rate": _safe_rate(sum(result is False for result in results), total),
++        "inconclusive_rate": _safe_rate(sum(result is None for result in results), total),
++    }
++
++
+ def _collect_topology_latency_diagnostics(
+     topology_id: str,
+     crosshaul_latency_limits: np.ndarray,
+@@ -93,9 +129,15 @@ def _collect_topology_latency_diagnostics(
+             direct_rc_delays.append(delay)
+ 
+     split_latency = {}
++    split_structural = {}
++    rh_direct_count = 0
++    for rh_node in [node for node in graph.nodes if node.startswith("RH")]:
++        if any(graph.has_edge(rh_node, rc_node) for rc_node in graph.nodes if rc_node.startswith("RC")):
++            rh_direct_count += 1
+     for split_idx, limit in enumerate(crosshaul_latency_limits):
+         split_key = f"S{split_idx + 1}"
+         if split_idx == 3:
++            structural_available = rh_direct_count > 0
+             compatible = [delay for delay in direct_rc_delays if delay <= float(limit)]
+             total = len(direct_rc_delays)
+             split_latency[split_key] = {
+@@ -108,6 +150,17 @@ def _collect_topology_latency_diagnostics(
+                 "strictly_possible_from_link_delay": bool(compatible),
+             }
+         else:
++            structural_available = any(
++                (
++                    u.startswith("RH") and v.startswith("ES") or u.startswith("ES") and v.startswith("RH")
++                )
++                for u, v in graph.edges()
++            ) and any(
++                (
++                    u.startswith("ES") and v.startswith("RC") or u.startswith("RC") and v.startswith("ES")
++                )
++                for u, v in graph.edges()
++            )
+             compatible = [delay for delay in es_rc_delays if delay <= float(limit)]
+             total = len(es_rc_delays)
+             split_latency[split_key] = {
+@@ -119,6 +172,7 @@ def _collect_topology_latency_diagnostics(
+                 "max_delay_ms": float(max(es_rc_delays)) if es_rc_delays else None,
+                 "strictly_possible_from_link_delay": bool(compatible),
+             }
++        split_structural[split_key] = structural_available
+ 
+     impossible_splits = [
+         split_key
+@@ -138,11 +192,27 @@ def _collect_topology_latency_diagnostics(
+             "min": float(min(direct_rc_delays)) if direct_rc_delays else None,
+             "max": float(max(direct_rc_delays)) if direct_rc_delays else None,
+         },
++        "min_feasible_crosshaul_delay_by_split_ms": {
++            split_key: payload["min_delay_ms"]
++            for split_key, payload in split_latency.items()
++        },
++        "direct_rh_rc_fraction": _safe_rate(rh_direct_count, spec.num_rhs),
++        "split_structurally_available": split_structural,
+         "split_latency_feasibility": split_latency,
+         "splits_ruled_out_by_link_delay": impossible_splits,
+     }
+ 
+ 
++def _collect_benchmark_audit(benchmark: str, crosshaul_latency_limits: np.ndarray) -> Dict[str, Dict[str, object]]:
++    audit = {}
++    for pool_name, topology_ids in DEFAULT_BENCHMARK_TOPOLOGY_POOLS[benchmark].items():
++        audit[pool_name] = {
++            topology_id: _collect_topology_latency_diagnostics(topology_id, crosshaul_latency_limits)
++            for topology_id in topology_ids
++        }
++    return audit
++
++
+ def _dict_l2_norm(state_dict: Dict[str, torch.Tensor]) -> float:
+     total = 0.0
+     for tensor in state_dict.values():
+@@ -246,6 +316,9 @@ def train_gppo(
+     episode_topology_pools = []
+     episode_has_structurally_valid_action = []
+     episode_has_strictly_valid_action = []
++    episode_has_greedy_strictly_valid_action = []
++    episode_has_exact_strictly_valid_action = []
++    episode_bounded_strict_feasibility_probe = []
+     episode_failure_counts = []
+     episode_cost_breakdowns = []
+     episode_split_usage = []
+@@ -265,9 +338,16 @@ def train_gppo(
+         episode_topology_pools.append(reset_info["topology_pool"])
+         episode_has_structurally_valid_action.append(bool(reset_info.get("has_structurally_valid_action", False)))
+         episode_has_strictly_valid_action.append(bool(reset_info.get("has_strictly_valid_action", False)))
++        episode_has_greedy_strictly_valid_action.append(bool(reset_info.get("has_greedy_strictly_valid_action", False)))
++        episode_has_exact_strictly_valid_action.append(reset_info.get("has_exact_strictly_valid_action"))
++        episode_bounded_strict_feasibility_probe.append(reset_info.get("bounded_strict_feasibility_probe", {}))
+         topology_debug = training_topology_debug.setdefault(reset_info["topology_id"], _zero_topology_debug())
+         topology_debug["resets"] += 1
+         topology_debug["strictly_valid_resets"] += int(bool(reset_info.get("has_strictly_valid_action", False)))
++        exact_reset = reset_info.get("has_exact_strictly_valid_action")
++        if exact_reset is True:
++            topology_debug["exact_strictly_valid_resets"] += 1
++        topology_debug["bounded_probe_results"].append(reset_info.get("bounded_strict_feasibility_probe", {}))
+         episode_reward = 0.0
+         valid_costs = []
+         valid_steps = 0
+@@ -317,6 +397,10 @@ def train_gppo(
+                     failure_counts[key] += int(value)
+                     topology_debug["invalid_counts_by_reason"][key] += int(value)
+                 topology_debug["invalid_reason_events"] += len(info["invalid_reasons"])
++                if info["invalid_reasons"]:
++                    first_reason = info["invalid_reasons"][0]
++                    reason_counts = topology_debug["first_failing_constraint_counts"]
++                    reason_counts[first_reason] = int(reason_counts.get(first_reason, 0)) + 1
+                 if len(first_failure_traces) < 12:
+                     split_vector = action[:env.num_rhs]
+                     split_summary = {f"S{i + 1}": int(np.sum(split_vector == i)) for i in range(4)}
+@@ -383,6 +467,7 @@ def train_gppo(
+                 "num_rcs": env.num_rcs,
+             },
+         },
++        "benchmark_audit": _collect_benchmark_audit(benchmark, env.crosshaul_latency_limits),
+         "episode_rewards": episode_rewards,
+         "episode_costs": episode_costs,
+         "valid_deployments": valid_deployments,
+@@ -390,6 +475,9 @@ def train_gppo(
+         "episode_topology_pools": episode_topology_pools,
+         "episode_has_structurally_valid_action": episode_has_structurally_valid_action,
+         "episode_has_strictly_valid_action": episode_has_strictly_valid_action,
++        "episode_has_greedy_strictly_valid_action": episode_has_greedy_strictly_valid_action,
++        "episode_has_exact_strictly_valid_action": episode_has_exact_strictly_valid_action,
++        "episode_bounded_strict_feasibility_probe": episode_bounded_strict_feasibility_probe,
+         "episode_failure_counts": episode_failure_counts,
+         "episode_cost_breakdowns": episode_cost_breakdowns,
+         "episode_split_usage": episode_split_usage,
+@@ -407,6 +495,11 @@ def train_gppo(
+                 for key in _zero_failure_counts()
+             },
+             "strict_feasible_reset_rate": float(np.mean(episode_has_strictly_valid_action)) if episode_has_strictly_valid_action else 0.0,
++            "exact_strict_feasible_reset_rate": float(
++                np.mean([value for value in episode_has_exact_strictly_valid_action if value is not None])
++            ) if any(value is not None for value in episode_has_exact_strictly_valid_action) else None,
++            "strict_feasibility_reporting": _strict_feasibility_wording(episode_has_exact_strictly_valid_action),
++            "bounded_strict_probe_summary": _bounded_probe_summary(episode_bounded_strict_feasibility_probe),
+             "episodes_with_no_strict_valid_action_rate": 1.0 - (
+                 float(np.mean(episode_has_strictly_valid_action)) if episode_has_strictly_valid_action else 0.0
+             ),
+@@ -428,6 +521,7 @@ def train_gppo(
+         step_count = max(int(topology_debug["steps"]), 1)
+         results["strict_mode_debug"]["per_topology"][topology_id] = {
+             "strict_feasible_reset_rate": float(topology_debug["strictly_valid_resets"] / max(int(topology_debug["resets"]), 1)),
++            "exact_strict_feasible_reset_count": int(topology_debug["exact_strictly_valid_resets"]),
+             "valid_step_rate": float(topology_debug["valid_steps"] / step_count),
+             "avg_invalid_reasons_per_step": float(topology_debug["invalid_reason_events"] / step_count),
+             "invalid_counts_by_reason": topology_debug["invalid_counts_by_reason"],
+@@ -435,6 +529,9 @@ def train_gppo(
+                 topology_debug["invalid_counts_by_reason"],
+                 step_count,
+             ),
++            "first_failing_constraint_counts": topology_debug["first_failing_constraint_counts"],
++            "bounded_probe_results": topology_debug["bounded_probe_results"],
++            "bounded_probe_summary": _bounded_probe_summary(topology_debug["bounded_probe_results"]),
+         }
+         results["strict_mode_debug"]["topology_latency_diagnostics"][topology_id] = _collect_topology_latency_diagnostics(
+             topology_id,
+@@ -486,9 +583,13 @@ def train_gppo(
+         f"saved={results['gnn_training_verification']['gnn_state_dict_saved']} "
+         f"delta_l2={results['gnn_training_verification']['parameter_delta_l2_norm']:.6f}"
+     )
+-    print(f"Strict-Feasible Reset Rate: {results['training_summary']['strict_feasible_reset_rate']:.1%}")
++    reporting = results["training_summary"]["strict_feasibility_reporting"]
++    print(f"{reporting['rate_label']}: {results['training_summary']['strict_feasible_reset_rate']:.1%}")
++    exact_rate = results["training_summary"]["exact_strict_feasible_reset_rate"]
++    if exact_rate is not None:
++        print(f"Exact Strict-Feasible Reset Rate: {exact_rate:.1%}")
+     print(
+-        "Episodes With No Strict-Valid Action: "
++        f"{reporting['no_action_label']}: "
+         f"{results['training_summary']['episodes_with_no_strict_valid_action_rate']:.1%}"
+     )
+     invalid_text = ", ".join(
+@@ -506,7 +607,7 @@ def train_gppo(
+     for topology_id, latency_debug in results["strict_mode_debug"]["topology_latency_diagnostics"].items():
+         impossible_splits = latency_debug["splits_ruled_out_by_link_delay"]
+         if impossible_splits:
+-            print(f"{topology_id} strict link-delay impossibility: {', '.join(impossible_splits)}")
++            print(f"{topology_id} strict link-delay rules out splits: {', '.join(impossible_splits)}")
+     print("=" * 60)
+ 
+     return agent, gnn, results
+@@ -539,9 +640,13 @@ def evaluate_gppo(
+     topology_ids = []
+     has_structurally_valid_action = []
+     has_strictly_valid_action = []
++    has_greedy_strictly_valid_action = []
++    has_exact_strictly_valid_action = []
++    bounded_strict_feasibility_probe = []
+     per_topology: Dict[str, Dict[str, object]] = {}
+     invalid_counts_by_reason = _zero_failure_counts()
+     latency_diagnostics = _collect_topology_latency_diagnostics(env.topology_id, env.crosshaul_latency_limits)
++    first_failing_constraint_counts: Dict[str, int] = {}
+ 
+     for episode in range(num_episodes):
+         _, reset_info = env.reset(
+@@ -557,6 +662,9 @@ def evaluate_gppo(
+         topology_ids.append(reset_info["topology_id"])
+         has_structurally_valid_action.append(bool(reset_info.get("has_structurally_valid_action", False)))
+         has_strictly_valid_action.append(bool(reset_info.get("has_strictly_valid_action", False)))
++        has_greedy_strictly_valid_action.append(bool(reset_info.get("has_greedy_strictly_valid_action", False)))
++        has_exact_strictly_valid_action.append(reset_info.get("has_exact_strictly_valid_action"))
++        bounded_strict_feasibility_probe.append(reset_info.get("bounded_strict_feasibility_probe", {}))
+         topology_summary = per_topology.setdefault(
+             reset_info["topology_id"],
+             {
+@@ -566,10 +674,13 @@ def evaluate_gppo(
+                 "total_steps": 0,
+                 "resets": 0,
+                 "strictly_valid_resets": 0,
++                "exact_strictly_valid_resets": 0,
+                 "invalid_reason_events": 0,
+                 "split_usage": _zero_split_usage(),
+                 "cost_breakdown": _zero_cost_breakdown(),
+                 "invalid_counts_by_reason": _zero_failure_counts(),
++                "first_failing_constraint_counts": {},
++                "bounded_probe_results": [],
+                 "topology_metadata": reset_info.get("topology_metadata", {}),
+                 "latency_diagnostics": _collect_topology_latency_diagnostics(
+                     reset_info["topology_id"],
+@@ -579,6 +690,9 @@ def evaluate_gppo(
+         )
+         topology_summary["resets"] += 1
+         topology_summary["strictly_valid_resets"] += int(bool(reset_info.get("has_strictly_valid_action", False)))
++        if reset_info.get("has_exact_strictly_valid_action") is True:
++            topology_summary["exact_strictly_valid_resets"] += 1
++        topology_summary["bounded_probe_results"].append(reset_info.get("bounded_strict_feasibility_probe", {}))
+ 
+         for _ in range(50):
+             adjacency, edge_features, _ = env._get_adjacency_info()
+@@ -614,6 +728,11 @@ def evaluate_gppo(
+                     invalid_counts_by_reason[key] += int(value)
+                     topology_summary["invalid_counts_by_reason"][key] += int(value)
+                 topology_summary["invalid_reason_events"] += len(info["invalid_reasons"])
++                if info["invalid_reasons"]:
++                    first_reason = info["invalid_reasons"][0]
++                    first_failing_constraint_counts[first_reason] = int(first_failing_constraint_counts.get(first_reason, 0)) + 1
++                    topology_counts = topology_summary["first_failing_constraint_counts"]
++                    topology_counts[first_reason] = int(topology_counts.get(first_reason, 0)) + 1
+             for key in topology_summary["cost_breakdown"]:
+                 topology_summary["cost_breakdown"][key] += float(info[key])
+             for key, value in info["split_usage"].items():
+@@ -636,17 +755,26 @@ def evaluate_gppo(
+         "topology_ids": topology_ids,
+         "has_structurally_valid_action": has_structurally_valid_action,
+         "has_strictly_valid_action": has_strictly_valid_action,
++        "has_greedy_strictly_valid_action": has_greedy_strictly_valid_action,
++        "has_exact_strictly_valid_action": has_exact_strictly_valid_action,
++        "bounded_strict_feasibility_probe": bounded_strict_feasibility_probe,
+         "avg_reward": float(np.mean(rewards)),
+         "std_reward": float(np.std(rewards)),
+         "avg_cost": float(np.mean(finite_costs)) if finite_costs else float("inf"),
+         "std_cost": float(np.std(finite_costs)) if finite_costs else float("inf"),
+         "valid_rate": float(np.mean([row["valid_steps"] / max(row["total_steps"], 1) for row in per_topology.values()])) if per_topology else 0.0,
+         "strict_feasible_reset_rate": float(np.mean(has_strictly_valid_action)) if has_strictly_valid_action else 0.0,
++        "exact_strict_feasible_reset_rate": float(
++            np.mean([value for value in has_exact_strictly_valid_action if value is not None])
++        ) if any(value is not None for value in has_exact_strictly_valid_action) else None,
++        "strict_feasibility_reporting": _strict_feasibility_wording(has_exact_strictly_valid_action),
++        "bounded_strict_probe_summary": _bounded_probe_summary(bounded_strict_feasibility_probe),
+         "invalid_counts_by_reason": invalid_counts_by_reason,
+         "invalid_reason_percentages": _invalid_reason_percentages(
+             invalid_counts_by_reason,
+             sum(int(row["total_steps"]) for row in per_topology.values()),
+         ),
++        "first_failing_constraint_counts": first_failing_constraint_counts,
+         "episodes_with_no_strict_valid_action_rate": 1.0 - (
+             float(np.mean(has_strictly_valid_action)) if has_strictly_valid_action else 0.0
+         ),
+@@ -662,6 +790,7 @@ def evaluate_gppo(
+             "mean_cost": float(np.mean(topology_costs)) if topology_costs else float("inf"),
+             "validity_rate": float(topology_summary["valid_steps"] / total_steps),
+             "strict_feasible_reset_rate": float(topology_summary["strictly_valid_resets"] / max(int(topology_summary["resets"]), 1)),
++            "exact_strict_feasible_reset_count": int(topology_summary["exact_strictly_valid_resets"]),
+             "avg_invalid_reasons_per_step": float(topology_summary["invalid_reason_events"] / total_steps),
+             "sla_penalty": float(topology_summary["cost_breakdown"]["sla_penalty"] / total_steps),
+             "invalid_counts_by_reason": topology_summary["invalid_counts_by_reason"],
+@@ -669,6 +798,9 @@ def evaluate_gppo(
+                 topology_summary["invalid_counts_by_reason"],
+                 total_steps,
+             ),
++            "first_failing_constraint_counts": topology_summary["first_failing_constraint_counts"],
++            "bounded_probe_results": topology_summary["bounded_probe_results"],
++            "bounded_probe_summary": _bounded_probe_summary(topology_summary["bounded_probe_results"]),
+             "split_distribution": {
+                 key: float(value / max(sum(topology_summary["split_usage"].values()), 1))
+                 for key, value in topology_summary["split_usage"].items()
+@@ -689,8 +821,10 @@ def evaluate_gppo(
+         print(f"Constraint Mode: {constraint_mode}")
+         print(f"Topologies: {sorted(set(topology_ids))}")
+         print(f"Structural Validity Rate At Reset: {np.mean(has_structurally_valid_action):.1%}")
+-        print(f"Strict-Feasible Rate At Reset: {summary['strict_feasible_reset_rate']:.1%}")
+-        print(f"Episodes With No Strict-Valid Action: {summary['episodes_with_no_strict_valid_action_rate']:.1%}")
++        print(f"{summary['strict_feasibility_reporting']['rate_label']}: {summary['strict_feasible_reset_rate']:.1%}")
++        if summary["exact_strict_feasible_reset_rate"] is not None:
++            print(f"Exact Strict-Feasible Rate At Reset: {summary['exact_strict_feasible_reset_rate']:.1%}")
++        print(f"{summary['strict_feasibility_reporting']['no_action_label']}: {summary['episodes_with_no_strict_valid_action_rate']:.1%}")
+         print(f"Valid Deployment Rate: {summary['valid_rate']:.1%}")
+         print(f"Average Reward: {summary['avg_reward']:.3f} ± {summary['std_reward']:.3f}")
+         if finite_costs:
+@@ -708,7 +842,7 @@ def evaluate_gppo(
+             )
+             impossible_splits = topology_summary["latency_diagnostics"]["splits_ruled_out_by_link_delay"]
+             if impossible_splits:
+-                print(f"  link-delay ruled out strict splits: {', '.join(impossible_splits)}")
++                print(f"  link-delay rules out strict splits: {', '.join(impossible_splits)}")
+         print("=" * 60)
+     return summary
+ 
+@@ -749,33 +883,50 @@ def compare_constraint_modes_on_pool(
+     num_episodes: int,
+     device: str,
+ ) -> Dict[str, object]:
++    staged_modes = [
++        "legacy",
++        "strict_connectivity_only",
++        "strict_connectivity_plus_capacity",
++        "strict_connectivity_plus_capacity_plus_bandwidth",
++        "strict_full",
++    ]
+     comparisons = {}
+     for topology_id in DEFAULT_BENCHMARK_TOPOLOGY_POOLS[benchmark][topology_pool_name]:
+-        legacy = evaluate_gppo(
+-            agent,
+-            gnn,
+-            num_episodes=num_episodes,
+-            benchmark=benchmark,
+-            device=device,
+-            topology_pool_name=topology_pool_name,
+-            topology_selection_mode="fixed",
+-            constraint_mode="legacy",
+-            topology_id=topology_id,
+-            verbose=False,
+-        )
+-        strict = evaluate_gppo(
+-            agent,
+-            gnn,
+-            num_episodes=num_episodes,
+-            benchmark=benchmark,
+-            device=device,
+-            topology_pool_name=topology_pool_name,
+-            topology_selection_mode="fixed",
+-            constraint_mode="strict",
+-            topology_id=topology_id,
+-            verbose=False,
+-        )
++        mode_summaries = {}
++        for mode in staged_modes:
++            mode_summaries[mode] = evaluate_gppo(
++                agent,
++                gnn,
++                num_episodes=num_episodes,
++                benchmark=benchmark,
++                device=device,
++                topology_pool_name=topology_pool_name,
++                topology_selection_mode="fixed",
++                constraint_mode=mode,
++                topology_id=topology_id,
++                verbose=False,
++            )
++        legacy = mode_summaries["legacy"]
++        strict = mode_summaries["strict_full"]
++        first_failing_constraint_class = None
++        for mode in staged_modes[1:]:
++            if mode_summaries[mode]["valid_rate"] < 1.0:
++                first_failing_constraint_class = mode
++                break
+         comparisons[topology_id] = {
++            "mode_summaries": {
++                mode: {
++                    "valid_rate": summary["valid_rate"],
++                    "avg_cost": summary["avg_cost"],
++                    "avg_reward": summary["avg_reward"],
++                    "strict_feasible_reset_rate": summary["strict_feasible_reset_rate"],
++                    "exact_strict_feasible_reset_rate": summary["exact_strict_feasible_reset_rate"],
++                    "invalid_reason_percentages": summary["invalid_reason_percentages"],
++                    "first_failing_constraint_counts": summary["first_failing_constraint_counts"],
++                    "strict_feasibility_reporting": summary["strict_feasibility_reporting"],
++                }
++                for mode, summary in mode_summaries.items()
++            },
+             "legacy": {
+                 "valid_rate": legacy["valid_rate"],
+                 "avg_cost": legacy["avg_cost"],
+@@ -786,8 +937,16 @@ def compare_constraint_modes_on_pool(
+                 "avg_cost": strict["avg_cost"],
+                 "avg_reward": strict["avg_reward"],
+                 "strict_feasible_reset_rate": strict["strict_feasible_reset_rate"],
++                "exact_strict_feasible_reset_rate": strict["exact_strict_feasible_reset_rate"],
+                 "episodes_with_no_strict_valid_action_rate": strict["episodes_with_no_strict_valid_action_rate"],
++                "first_failing_constraint_counts": strict["first_failing_constraint_counts"],
++                "invalid_reason_percentages": strict["invalid_reason_percentages"],
++                "strict_feasibility_reporting": strict["strict_feasibility_reporting"],
+             },
++            "first_failing_constraint_class": first_failing_constraint_class,
++            "no_strict_valid_reset_count": int(
++                sum(1 for value in strict["has_strictly_valid_action"] if not value)
++            ),
+             "valid_rate_gap": legacy["valid_rate"] - strict["valid_rate"],
+         }
+     return comparisons
+@@ -813,7 +972,14 @@ def build_train_parser() -> argparse.ArgumentParser:
+     )
+     parser.add_argument(
+         "--constraint-mode",
+-        choices=["legacy", "strict"],
++        choices=[
++            "legacy",
++            "strict",
++            "strict_connectivity_only",
++            "strict_connectivity_plus_capacity",
++            "strict_connectivity_plus_capacity_plus_bandwidth",
++            "strict_full",
++        ],
+         default="legacy",
+         help="Constraint handling mode",
+     )
+@@ -877,7 +1043,7 @@ def run_training_from_args(args: argparse.Namespace) -> None:
+             ),
+         }
+         print("\n" + "=" * 60)
+-        print("Legacy vs Strict Comparison")
++        print("Staged Constraint Comparison")
+         print("=" * 60)
+         for pool_name, pool_results in results["constraint_mode_comparison"].items():
+             print(f"{pool_name}:")
+@@ -887,8 +1053,23 @@ def run_training_from_args(args: argparse.Namespace) -> None:
+                     f"legacy_valid={comparison['legacy']['valid_rate']:.1%} "
+                     f"strict_valid={comparison['strict']['valid_rate']:.1%} "
+                     f"gap={comparison['valid_rate_gap']:.1%} "
+-                    f"strict_no_action={comparison['strict']['episodes_with_no_strict_valid_action_rate']:.1%}"
++                    f"strict_no_action={comparison['strict']['episodes_with_no_strict_valid_action_rate']:.1%} "
++                    f"first_fail={comparison['first_failing_constraint_class'] or 'none'}"
+                 )
++                if args.benchmark == "large":
++                    for mode_name, mode_summary in comparison["mode_summaries"].items():
++                        invalid_text = ", ".join(
++                            f"{key}={value:.0%}"
++                            for key, value in mode_summary["invalid_reason_percentages"].items()
++                            if value
++                        ) or "none"
++                        print(
++                            f"    {mode_name}: "
++                            f"valid={mode_summary['valid_rate']:.1%} "
++                            f"reward={mode_summary['avg_reward']:.3f} "
++                            f"cost={mode_summary['avg_cost']:.3f} "
++                            f"invalid={invalid_text}"
++                        )
+         with args.results_path.open("w", encoding="utf-8") as file_obj:
+             json.dump(results, file_obj, indent=2)
+ 

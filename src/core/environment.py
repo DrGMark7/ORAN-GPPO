@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Dict, List, Optional, Tuple
 
 import gymnasium as gym
@@ -12,9 +13,12 @@ from .topology_pool import TopologyPool
 
 
 class SimplifiedORANEnv(gym.Env):
-    """Paper-aligned GPPO baseline environment with controlled topology pools."""
+    """Paper-aligned GPPO baseline environment with explicit per-time-slot decisions."""
 
     metadata = {"render_modes": ["human"]}
+    EXACT_FEASIBILITY_MAX_RHS = 10
+    BOUNDED_FEASIBILITY_RHS = 8
+    BOUNDED_FEASIBILITY_VISIT_LIMIT = 50_000
 
     def __init__(
         self,
@@ -37,8 +41,16 @@ class SimplifiedORANEnv(gym.Env):
         self.benchmark = benchmark
         self.topology_pool_name = topology_pool_name
         self.topology_selection_mode = topology_selection_mode
-        if constraint_mode not in {"legacy", "strict"}:
-            raise ValueError("constraint_mode must be 'legacy' or 'strict'")
+        valid_constraint_modes = {
+            "legacy",
+            "strict",
+            "strict_connectivity_only",
+            "strict_connectivity_plus_capacity",
+            "strict_connectivity_plus_capacity_plus_bandwidth",
+            "strict_full",
+        }
+        if constraint_mode not in valid_constraint_modes:
+            raise ValueError(f"constraint_mode must be one of {sorted(valid_constraint_modes)}")
         self.constraint_mode = constraint_mode
         self.requested_topology_id = topology_id
         self.topology_registry = topology_registry or DEFAULT_TOPOLOGY_REGISTRY
@@ -186,7 +198,10 @@ class SimplifiedORANEnv(gym.Env):
         self.rc_remaining = np.ones(self.num_rcs, dtype=np.float32) * self.rc_capacity
         self._sample_requests()
         feasible_action = self.find_feasible_action(constraint_mode="legacy")
-        strict_feasible_action = self.find_feasible_action(constraint_mode="strict")
+        greedy_strict_feasible_action = self.find_feasible_action(constraint_mode="strict_full")
+        exact_strict_feasible = self.has_exact_feasible_action(constraint_mode="strict_full")
+        bounded_strict_probe = self.probe_bounded_feasible_action(constraint_mode="strict_full")
+        strict_feasible_exists = exact_strict_feasible if exact_strict_feasible is not None else (greedy_strict_feasible_action is not None)
         self._refresh_edge_state({})
         info = {
             "topology_id": self.topology_id,
@@ -195,8 +210,13 @@ class SimplifiedORANEnv(gym.Env):
             "topology_pool": self.topology_pool_name,
             "topology_selection_mode": selection.selection_mode,
             "topology_metadata": dict(self.topology_spec.metadata),
+            "time_slot": 0,
+            "episode_length_time_slots": self.max_steps,
             "has_structurally_valid_action": feasible_action is not None,
-            "has_strictly_valid_action": strict_feasible_action is not None,
+            "has_strictly_valid_action": bool(strict_feasible_exists),
+            "has_greedy_strictly_valid_action": greedy_strict_feasible_action is not None,
+            "has_exact_strictly_valid_action": exact_strict_feasible,
+            "bounded_strict_feasibility_probe": bounded_strict_probe,
         }
         return self._get_state(), info
 
@@ -345,8 +365,192 @@ class SimplifiedORANEnv(gym.Env):
         metrics = self._evaluate_action(action, constraint_mode_override=constraint_mode)
         return action if metrics["valid"] else None
 
+    def _constraint_mode_alias(self, constraint_mode: str) -> str:
+        if constraint_mode == "strict":
+            return "strict_full"
+        return constraint_mode
+
+    def _enforced_reason_set(self, constraint_mode: str) -> set[str]:
+        active_mode = self._constraint_mode_alias(constraint_mode)
+        if active_mode in {"legacy", "strict_connectivity_only"}:
+            return set()
+        if active_mode == "strict_connectivity_plus_capacity":
+            return {"es_capacity_exceeded", "rc_capacity_exceeded"}
+        if active_mode == "strict_connectivity_plus_capacity_plus_bandwidth":
+            return {"es_capacity_exceeded", "rc_capacity_exceeded", "bandwidth_exceeded"}
+        if active_mode == "strict_full":
+            return {
+                "es_capacity_exceeded",
+                "rc_capacity_exceeded",
+                "bandwidth_exceeded",
+                "e2e_latency_exceeded",
+                "crosshaul_latency_exceeded",
+            }
+        raise ValueError(f"Unsupported constraint_mode: {constraint_mode}")
+
+    def _candidate_assignments_for_rh(self, rh_idx: int) -> List[Tuple[int, int, int]]:
+        rh_node = f"RH{rh_idx}"
+        candidates: List[Tuple[int, int, int]] = []
+        for split in range(self.split_options):
+            if split == 3:
+                for rc_idx in self._get_direct_rc_options(rh_idx):
+                    candidates.append((split, 0, rc_idx))
+                continue
+            for es_idx in range(self.num_ess):
+                es_node = f"ES{es_idx}"
+                if not self.topology.has_edge(rh_node, es_node):
+                    continue
+                for rc_idx in range(self.num_rcs):
+                    rc_node = f"RC{rc_idx}"
+                    if self.topology.has_edge(es_node, rc_node):
+                        candidates.append((split, es_idx, rc_idx))
+        return candidates
+
+    def _search_feasible_action(
+        self,
+        *,
+        constraint_mode: str,
+        rh_indices: List[int],
+        visit_limit: Optional[int] = None,
+    ) -> Optional[bool]:
+        enforced_reasons = self._enforced_reason_set(constraint_mode)
+        candidate_map = {
+            rh_idx: self._candidate_assignments_for_rh(rh_idx)
+            for rh_idx in rh_indices
+        }
+        if any(not candidate_map[rh_idx] for rh_idx in rh_indices):
+            return False
+
+        order = sorted(rh_indices, key=lambda rh_idx: len(candidate_map[rh_idx]))
+        edge_caps = []
+        edge_index: Dict[Tuple[str, str], int] = {}
+        for idx, (u, v) in enumerate(self.edge_order):
+            edge_key = self._edge_key(u, v)
+            edge_index[edge_key] = idx
+            edge_caps.append(float(self.topology.edges[u, v]["bandwidth"]))
+        visit_count = 0
+
+        @lru_cache(maxsize=None)
+        def dfs(
+            pos: int,
+            es_loads: Tuple[float, ...],
+            rc_loads: Tuple[float, ...],
+            edge_usage: Tuple[float, ...],
+        ) -> bool:
+            nonlocal visit_count
+            visit_count += 1
+            if visit_limit is not None and visit_count > visit_limit:
+                raise RuntimeError("bounded_feasibility_visit_limit_reached")
+            if pos == len(order):
+                return True
+
+            rh_idx = order[pos]
+            demand = float(self.rh_demands[rh_idx])
+            demand_gbps = demand / 1000.0
+            rh_latency = float(self.rh_latencies[rh_idx])
+
+            for split, es_idx, rc_idx in candidate_map[rh_idx]:
+                next_es = list(es_loads)
+                next_rc = list(rc_loads)
+                next_edge = list(edge_usage)
+                invalid_reasons = set()
+
+                if split == 3:
+                    next_rc[rc_idx] += float(self.cu_costs[split] * demand)
+                    if next_rc[rc_idx] > self.rc_capacity + 1e-9:
+                        invalid_reasons.add("rc_capacity_exceeded")
+                    direct_edge = self.topology.edges[f"RH{rh_idx}", f"RC{rc_idx}"]
+                    edge_key = self._edge_key(f"RH{rh_idx}", f"RC{rc_idx}")
+                    edge_idx = edge_index[edge_key]
+                    next_edge[edge_idx] += demand_gbps
+                    if next_edge[edge_idx] > edge_caps[edge_idx] + 1e-9:
+                        invalid_reasons.add("bandwidth_exceeded")
+                    direct_delay = float(direct_edge["delay"])
+                    if direct_delay > rh_latency + 1e-9:
+                        invalid_reasons.add("e2e_latency_exceeded")
+                    if direct_delay > float(self.crosshaul_latency_limits[split]) + 1e-9:
+                        invalid_reasons.add("crosshaul_latency_exceeded")
+                else:
+                    next_es[es_idx] += float(self.du_costs[split] * demand)
+                    next_rc[rc_idx] += float(self.cu_costs[split] * demand)
+                    if next_es[es_idx] > self.es_capacity + 1e-9:
+                        invalid_reasons.add("es_capacity_exceeded")
+                    if next_rc[rc_idx] > self.rc_capacity + 1e-9:
+                        invalid_reasons.add("rc_capacity_exceeded")
+                    edge_key = self._edge_key(f"ES{es_idx}", f"RC{rc_idx}")
+                    edge_idx = edge_index[edge_key]
+                    next_edge[edge_idx] += demand_gbps
+                    if next_edge[edge_idx] > edge_caps[edge_idx] + 1e-9:
+                        invalid_reasons.add("bandwidth_exceeded")
+                    rh_es_edge = self.topology.edges[f"RH{rh_idx}", f"ES{es_idx}"]
+                    es_rc_edge = self.topology.edges[f"ES{es_idx}", f"RC{rc_idx}"]
+                    e2e_delay = float(rh_es_edge["delay"] + es_rc_edge["delay"])
+                    crosshaul_delay = float(es_rc_edge["delay"])
+                    if e2e_delay > rh_latency + 1e-9:
+                        invalid_reasons.add("e2e_latency_exceeded")
+                    if crosshaul_delay > float(self.crosshaul_latency_limits[split]) + 1e-9:
+                        invalid_reasons.add("crosshaul_latency_exceeded")
+
+                if invalid_reasons & enforced_reasons:
+                    continue
+
+                rounded_es = tuple(round(value, 6) for value in next_es)
+                rounded_rc = tuple(round(value, 6) for value in next_rc)
+                rounded_edge = tuple(round(value, 6) for value in next_edge)
+                if dfs(pos + 1, rounded_es, rounded_rc, rounded_edge):
+                    return True
+            return False
+
+        try:
+            return dfs(
+                0,
+                tuple(0.0 for _ in range(self.num_ess)),
+                tuple(0.0 for _ in range(self.num_rcs)),
+                tuple(0.0 for _ in range(len(self.edge_order))),
+            )
+        except RuntimeError as exc:
+            if str(exc) == "bounded_feasibility_visit_limit_reached":
+                return None
+            raise
+
+    def has_exact_feasible_action(self, constraint_mode: str = "strict_full") -> Optional[bool]:
+        if self.num_rhs > self.EXACT_FEASIBILITY_MAX_RHS:
+            return None
+        return self._search_feasible_action(
+            constraint_mode=constraint_mode,
+            rh_indices=list(range(self.num_rhs)),
+            visit_limit=None,
+        )
+
+    def probe_bounded_feasible_action(
+        self,
+        constraint_mode: str = "strict_full",
+        max_rhs: Optional[int] = None,
+        visit_limit: Optional[int] = None,
+    ) -> Dict[str, object]:
+        capped_rhs = min(self.num_rhs, max_rhs or self.BOUNDED_FEASIBILITY_RHS)
+        capped_visit_limit = visit_limit or self.BOUNDED_FEASIBILITY_VISIT_LIMIT
+        result = self._search_feasible_action(
+            constraint_mode=constraint_mode,
+            rh_indices=list(range(capped_rhs)),
+            visit_limit=capped_visit_limit,
+        )
+        return {
+            "result": result,
+            "rhs_considered": int(capped_rhs),
+            "visit_limit": int(capped_visit_limit),
+            "is_full_instance": bool(capped_rhs == self.num_rhs),
+            "is_exact": bool(capped_rhs == self.num_rhs and result is not None and self.num_rhs <= self.EXACT_FEASIBILITY_MAX_RHS),
+            "status": (
+                "exact"
+                if capped_rhs == self.num_rhs and result is not None and self.num_rhs <= self.EXACT_FEASIBILITY_MAX_RHS
+                else "bounded"
+            ),
+        }
+
     def _evaluate_action(self, action: np.ndarray, constraint_mode_override: Optional[str] = None) -> Dict[str, object]:
-        active_constraint_mode = constraint_mode_override or self.constraint_mode
+        active_constraint_mode = self._constraint_mode_alias(constraint_mode_override or self.constraint_mode)
+        enforced_reasons = self._enforced_reason_set(active_constraint_mode)
         splits, es_choices, rc_choices = self._split_action(action)
         nfail = 0
         failure_counts = {
@@ -431,9 +635,18 @@ class SimplifiedORANEnv(gym.Env):
                 self.cu_costs[split] * float(self.rh_demands[rh_idx])
             )
 
+        split_changes = 0
+        es_changes = 0
+        rc_changes = 0
+        total_reconfiguration_changes = 0
         reconfiguration_cost = 0.0
         if self.prev_action is not None:
-            reconfiguration_cost = self.phi_r * float(np.count_nonzero(np.asarray(action) != self.prev_action))
+            prev_splits, prev_es_choices, prev_rc_choices = self._split_action(self.prev_action)
+            split_changes = int(np.count_nonzero(splits != prev_splits))
+            es_changes = int(np.count_nonzero(es_choices != prev_es_choices))
+            rc_changes = int(np.count_nonzero(rc_choices != prev_rc_choices))
+            total_reconfiguration_changes = split_changes + es_changes + rc_changes
+            reconfiguration_cost = self.phi_r * float(total_reconfiguration_changes)
 
         es_overuse = np.maximum(du_load - self.es_capacity, 0.0).sum()
         rc_overuse = np.maximum(cu_load - self.rc_capacity, 0.0).sum()
@@ -464,9 +677,9 @@ class SimplifiedORANEnv(gym.Env):
             failure_counts["crosshaul_latency_exceeded"] = 1
             invalid_reasons.append("crosshaul_latency_exceeded")
 
-        if active_constraint_mode == "strict" and invalid_reasons:
+        if enforced_reasons.intersection(invalid_reasons):
             valid = False
-            nfail += len(invalid_reasons)
+            nfail += len(enforced_reasons.intersection(invalid_reasons))
 
         return {
             "valid": valid,
@@ -482,6 +695,10 @@ class SimplifiedORANEnv(gym.Env):
             "processing_cost": float(total_processing_cost),
             "routing_cost": float(total_routing_cost),
             "reconfiguration_cost": float(reconfiguration_cost),
+            "split_changes": split_changes,
+            "es_changes": es_changes,
+            "rc_changes": rc_changes,
+            "total_reconfiguration_changes": total_reconfiguration_changes,
             "sla_penalty": slack_penalty,
             "total_cost": total_cost,
             "failure_counts": failure_counts,
@@ -491,6 +708,7 @@ class SimplifiedORANEnv(gym.Env):
         }
 
     def step(self, action) -> Tuple[np.ndarray, float, bool, bool, Dict]:
+        # One environment step corresponds to one paper-style time slot.
         self.current_step += 1
         metrics = self._evaluate_action(np.asarray(action, dtype=int))
 
@@ -513,11 +731,18 @@ class SimplifiedORANEnv(gym.Env):
         self._sample_requests()
         state = self._get_state()
         info = {
+            "time_slot": self.current_step,
+            "episode_length_time_slots": self.max_steps,
             "valid_deployment": bool(metrics["valid"]),
             "deployment_cost": metrics["total_cost"] if metrics["valid"] else float("inf"),
+            "raw_total_cost": metrics["total_cost"],
             "processing_cost": metrics["processing_cost"],
             "routing_cost": metrics["routing_cost"],
             "reconfiguration_cost": metrics["reconfiguration_cost"],
+            "split_changes": metrics["split_changes"],
+            "es_changes": metrics["es_changes"],
+            "rc_changes": metrics["rc_changes"],
+            "total_reconfiguration_changes": metrics["total_reconfiguration_changes"],
             "sla_penalty": metrics["sla_penalty"],
             "es_overuse": metrics["es_overuse"],
             "rc_overuse": metrics["rc_overuse"],

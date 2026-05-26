@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 
+from src.common.paths import DEFAULT_RESULTS_PATH
 from src.visualization.animation import create_all_animations
 from src.workflows.demo import run_demo
 from src.workflows.training import build_train_parser, run_training_from_args
@@ -24,6 +25,7 @@ def main(argv=None) -> None:
     animate_parser = subparsers.add_parser("animate", help="Generate animations")
     animate_parser.add_argument("--results-path", type=Path, default=None, help="Optional training results path")
     animate_parser.add_argument("--gif-workers", type=int, default=None, help="Worker threads for GIF frame rendering")
+    animate_parser.add_argument("--episode-trace-path", type=Path, default=None, help="Optional evaluated episode trace JSON path")
 
     args = parser.parse_args(argv)
 
@@ -34,7 +36,11 @@ def main(argv=None) -> None:
     elif args.command == "visualize":
         generate_all_visualizations(results_path=args.results_path, checkpoint_path=args.checkpoint_path)
     elif args.command == "animate":
-        create_all_animations(args.results_path, gif_workers=args.gif_workers) if args.results_path else create_all_animations(gif_workers=args.gif_workers)
+        create_all_animations(
+            args.results_path if args.results_path else DEFAULT_RESULTS_PATH,
+            gif_workers=args.gif_workers,
+            episode_trace_path=args.episode_trace_path,
+        )
 
 
 if __name__ == "__main__":

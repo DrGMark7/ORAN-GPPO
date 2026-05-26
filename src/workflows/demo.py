@@ -22,9 +22,11 @@ def demo_environment() -> None:
 
     sample_action = env.action_space.sample()
     _, reward, _, _, info = env.step(sample_action)
+    print("One environment step corresponds to one paper time slot.")
     print(f"Sample reward: {reward:.4f}")
     print(f"Valid deployment: {info['valid_deployment']}")
     print(f"Deployment cost: {info['deployment_cost']}")
+    print(f"Time slot: {info['time_slot']} / {info['episode_length_time_slots']}")
 
 
 def demo_gnn() -> None:
@@ -123,8 +125,9 @@ def demo_integration() -> None:
         _, reward, terminated, truncated, info = env.step(action)
 
         print(
-            f"Step {step + 1}: reward={reward:.4f}, "
-            f"valid={info['valid_deployment']}, cost={info['deployment_cost']}"
+            f"Time slot {step + 1}: reward={reward:.4f}, "
+            f"valid={info['valid_deployment']}, cost={info['deployment_cost']}, "
+            f"reconfig_changes={info['total_reconfiguration_changes']}"
         )
 
         if terminated or truncated:

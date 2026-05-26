@@ -261,12 +261,12 @@ class NetworkTopologyVisualizer:
 
             info = inference["info"]
             title = (
-                f"{env.topology_id} | "
+                f"Single Time-Slot Decision Snapshot | {env.topology_id} | "
                 f"valid={info['valid_deployment']} cost={info['deployment_cost']:.2f} "
                 f"failed_links={info['failed_links']}"
             )
         else:
-            title = f"{env.topology_id} | No checkpoint inference"
+            title = f"Single Time-Slot Decision Snapshot | {env.topology_id} | No checkpoint inference"
 
         legend_handles = [
             mpatches.Patch(color="#e76f51", label="Radio Head"),
