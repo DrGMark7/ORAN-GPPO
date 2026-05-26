@@ -1,5 +1,6 @@
 import argparse
 import json
+import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -40,6 +41,24 @@ def _zero_reconfiguration_stats() -> Dict[str, float]:
         "es_changes": 0.0,
         "rc_changes": 0.0,
         "total_reconfiguration_changes": 0.0,
+    }
+
+
+def _zero_timing_stats() -> Dict[str, float]:
+    return {
+        "total_seconds": 0.0,
+        "reset_seconds": 0.0,
+        "adjacency_seconds": 0.0,
+        "graph_build_seconds": 0.0,
+        "gnn_forward_seconds": 0.0,
+        "action_selection_seconds": 0.0,
+        "env_step_seconds": 0.0,
+        "store_transition_seconds": 0.0,
+        "ppo_update_seconds": 0.0,
+        "results_write_seconds": 0.0,
+        "checkpoint_save_seconds": 0.0,
+        "evaluation_seconds": 0.0,
+        "comparison_seconds": 0.0,
     }
 
 
@@ -322,6 +341,8 @@ def train_gppo(
     constraint_mode: str = "legacy",
     train_topology_id: Optional[str] = None,
 ) -> Tuple[PPOAgent, torch.nn.Module, dict]:
+    train_start_time = time.perf_counter()
+    timing_stats = _zero_timing_stats()
     np.random.seed(seed)
     torch.manual_seed(seed)
     ensure_output_dirs()
@@ -395,6 +416,7 @@ def train_gppo(
     first_failure_traces = []
 
     for episode in tqdm(range(num_episodes), desc="Training"):
+        reset_start = time.perf_counter()
         _, reset_info = env.reset(
             seed=seed + episode,
             options={
@@ -403,6 +425,7 @@ def train_gppo(
                 "topology_id": train_topology_id,
             },
         )
+        timing_stats["reset_seconds"] += time.perf_counter() - reset_start
         episode_topology_ids.append(reset_info["topology_id"])
         episode_topology_pools.append(reset_info["topology_pool"])
         episode_has_structurally_valid_action.append(bool(reset_info.get("has_structurally_valid_action", False)))
@@ -427,7 +450,11 @@ def train_gppo(
         time_slot_count = 0
 
         for _ in range(max_steps):
+            adjacency_start = time.perf_counter()
             adjacency, edge_features, _ = env._get_adjacency_info()
+            timing_stats["adjacency_seconds"] += time.perf_counter() - adjacency_start
+
+            graph_build_start = time.perf_counter()
             graph = graph_builder.build_graph(
                 env.rh_demands,
                 env.rh_latencies,
@@ -436,19 +463,31 @@ def train_gppo(
                 adjacency,
                 edge_features,
             )
+            timing_stats["graph_build_seconds"] += time.perf_counter() - graph_build_start
 
-            features = gnn(graph.to(device))
+            # Rollout action selection does not need gradients because PPO
+            # recomputes graph features during `agent.update()`.
+            gnn_forward_start = time.perf_counter()
+            with torch.no_grad():
+                features = gnn(graph.to(device))
+            timing_stats["gnn_forward_seconds"] += time.perf_counter() - gnn_forward_start
 
+            action_selection_start = time.perf_counter()
             action_mask = env.get_action_mask()
             action, log_prob, value, used_action_mask = agent.select_action_sequential(
                 features.squeeze(0),
                 action_mask,
                 env.get_conditional_rc_mask,
             )
+            timing_stats["action_selection_seconds"] += time.perf_counter() - action_selection_start
+
+            env_step_start = time.perf_counter()
             _, reward, terminated, truncated, info = env.step(action)
+            timing_stats["env_step_seconds"] += time.perf_counter() - env_step_start
             topology_debug["time_slots"] += 1
             time_slot_count += 1
 
+            store_transition_start = time.perf_counter()
             agent.store_transition(
                 graph,
                 action,
@@ -458,6 +497,7 @@ def train_gppo(
                 terminated or truncated,
                 used_action_mask,
             )
+            timing_stats["store_transition_seconds"] += time.perf_counter() - store_transition_start
 
             episode_reward += reward
             if info["valid_deployment"]:
@@ -502,7 +542,9 @@ def train_gppo(
             if terminated or truncated:
                 break
 
+        ppo_update_start = time.perf_counter()
         agent.update(batch_size=batch_size, epochs=3)
+        timing_stats["ppo_update_seconds"] += time.perf_counter() - ppo_update_start
 
         episode_rewards.append(float(episode_reward))
         episode_costs.append(float(np.mean(valid_costs)) if valid_costs else float("inf"))
@@ -578,6 +620,7 @@ def train_gppo(
         "episode_reconfiguration_stats": episode_reconfiguration_stats,
         "episode_split_usage": episode_split_usage,
         "training_summary": {
+            "timing_profile_seconds": dict(timing_stats),
             "split_usage": {
                 key: int(sum(split[key] for split in episode_split_usage))
                 for key in _zero_split_usage()
@@ -660,9 +703,15 @@ def train_gppo(
         "parameter_delta_l2_norm": float(gnn_delta_sq ** 0.5),
     }
 
+    timing_stats["total_seconds"] = time.perf_counter() - train_start_time
+    results["training_summary"]["timing_profile_seconds"] = dict(timing_stats)
+    results_write_start = time.perf_counter()
     with results_path.open("w", encoding="utf-8") as file_obj:
         json.dump(results, file_obj, indent=2)
+    timing_stats["results_write_seconds"] += time.perf_counter() - results_write_start
+    results["training_summary"]["timing_profile_seconds"] = dict(timing_stats)
 
+    checkpoint_save_start = time.perf_counter()
     agent.save(
         str(checkpoint_path),
         metadata={
@@ -676,6 +725,10 @@ def train_gppo(
             "episode_length_time_slots": max_steps,
         },
     )
+    timing_stats["checkpoint_save_seconds"] += time.perf_counter() - checkpoint_save_start
+    results["training_summary"]["timing_profile_seconds"] = dict(timing_stats)
+    with results_path.open("w", encoding="utf-8") as file_obj:
+        json.dump(results, file_obj, indent=2)
 
     print("\n" + "=" * 60)
     print("Training Complete!")
@@ -726,6 +779,17 @@ def train_gppo(
     print(
         "Reconfiguration Cost Share Of Total Cost: "
         f"{reconfig_summary['reconfiguration_cost_pct_of_total_cost']:.2f}%"
+    )
+    timing_summary = results["training_summary"]["timing_profile_seconds"]
+    print(
+        "Timing Profile (s): "
+        f"total={timing_summary['total_seconds']:.3f}, "
+        f"reset={timing_summary['reset_seconds']:.3f}, "
+        f"graph={timing_summary['graph_build_seconds']:.3f}, "
+        f"gnn={timing_summary['gnn_forward_seconds']:.3f}, "
+        f"action={timing_summary['action_selection_seconds']:.3f}, "
+        f"env_step={timing_summary['env_step_seconds']:.3f}, "
+        f"ppo_update={timing_summary['ppo_update_seconds']:.3f}"
     )
     for topology_id, latency_debug in results["strict_mode_debug"]["topology_latency_diagnostics"].items():
         impossible_splits = latency_debug["splits_ruled_out_by_link_delay"]
@@ -1271,6 +1335,7 @@ def run_training_from_args(args: argparse.Namespace) -> None:
         train_topology_id=args.train_topology_id,
     )
     if not args.skip_eval:
+        evaluation_start = time.perf_counter()
         train_eval = evaluate_pool_by_topology(
             agent,
             gnn,
@@ -1281,6 +1346,7 @@ def run_training_from_args(args: argparse.Namespace) -> None:
             constraint_mode=args.constraint_mode,
             max_steps=effective_max_steps,
         )
+        train_eval_done = time.perf_counter()
         test_eval = evaluate_pool_by_topology(
             agent,
             gnn,
@@ -1291,10 +1357,12 @@ def run_training_from_args(args: argparse.Namespace) -> None:
             constraint_mode=args.constraint_mode,
             max_steps=effective_max_steps,
         )
+        eval_done = time.perf_counter()
         results["evaluation"] = {
             "train_pool": train_eval,
             "test_pool": test_eval,
         }
+        results["training_summary"]["timing_profile_seconds"]["evaluation_seconds"] = eval_done - evaluation_start
         results["constraint_mode_comparison"] = {
             "train_pool": compare_constraint_modes_on_pool(
                 agent,
@@ -1315,6 +1383,10 @@ def run_training_from_args(args: argparse.Namespace) -> None:
                 max_steps=effective_max_steps,
             ),
         }
+        comparison_done = time.perf_counter()
+        results["training_summary"]["timing_profile_seconds"]["comparison_seconds"] = comparison_done - eval_done
+        results["training_summary"]["timing_profile_seconds"]["evaluation_train_pool_seconds"] = train_eval_done - evaluation_start
+        results["training_summary"]["timing_profile_seconds"]["evaluation_test_pool_seconds"] = eval_done - train_eval_done
         print("\n" + "=" * 60)
         print("Staged Constraint Comparison")
         print("=" * 60)
