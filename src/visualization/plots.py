@@ -17,6 +17,9 @@ from src.common.paths import DEFAULT_CHECKPOINT_PATH, EPISODE_TRACES_DIR, OUTPUT
 from src.core import GNNFeatureExtractor, ORANGraphBuilder, PPOAgent, SimplifiedORANEnv, get_topology_spec
 
 
+_SKIPPED_PLOTS: List[Tuple[str, str]] = []
+
+
 def _load_csv_rows(csv_path: str | Path) -> List[Dict[str, str]]:
     path = Path(csv_path)
     if not path.exists():
@@ -55,8 +58,36 @@ def _moving_average(values: np.ndarray, window: Optional[int] = None) -> np.ndar
 
 
 def _skip_plot(save_path: str | Path, reason: str):
-    print(f"Skipping {Path(save_path).name}: {reason}")
+    _SKIPPED_PLOTS.append((Path(save_path).name, reason))
     return None
+
+
+def clear_skip_plot_messages() -> None:
+    _SKIPPED_PLOTS.clear()
+
+
+def consume_skip_plot_messages() -> List[Tuple[str, str]]:
+    skipped = list(_SKIPPED_PLOTS)
+    _SKIPPED_PLOTS.clear()
+    return skipped
+
+
+def _short_label(label: str, limit: int = 22) -> str:
+    if len(label) <= limit:
+        return label
+    return f"{label[:limit - 3]}..."
+
+
+def _apply_category_ticks(ax, labels: List[str], rotation: int = 28, limit: int = 22) -> None:
+    ax.set_xticks(np.arange(len(labels)))
+    ax.set_xticklabels([_short_label(label, limit=limit) for label in labels], rotation=rotation, ha="right")
+
+
+def _finalize_figure(fig) -> None:
+    try:
+        fig.tight_layout()
+    except Exception:
+        pass
 
 
 class NetworkTopologyVisualizer:
@@ -226,7 +257,7 @@ class NetworkTopologyVisualizer:
         self,
         save_path: Optional[str] = None,
         checkpoint_path: Optional[str] = str(DEFAULT_CHECKPOINT_PATH),
-        figsize: Tuple[int, int] = (16, 11),
+        figsize: Tuple[int, int] = (16, 10),
         device: str = "cpu",
         topology_pool_name: str = "train",
         topology_id: Optional[str] = None,
@@ -277,11 +308,27 @@ class NetworkTopologyVisualizer:
 
         edge_labels = {}
         for u, v, data in graph.edges(data=True):
-            edge_labels[(u, v)] = f"d={data['delay']:.2f}\nbw={data['bandwidth']:.1f}"
-        nx.draw_networkx_edge_labels(graph, pos, edge_labels=edge_labels, font_size=7, rotate=False, ax=ax, bbox={"alpha": 0.75, "color": "white", "pad": 0.15})
+            if not (
+                (u.startswith("ES") and v.startswith("RC")) or
+                (u.startswith("RC") and v.startswith("ES")) or
+                (u.startswith("RH") and v.startswith("RC")) or
+                (u.startswith("RC") and v.startswith("RH"))
+            ):
+                continue
+            edge_labels[(u, v)] = f"d={data['delay']:.2f} bw={data['bandwidth']:.0f}"
+        nx.draw_networkx_edge_labels(
+            graph,
+            pos,
+            edge_labels=edge_labels,
+            font_size=6,
+            rotate=False,
+            ax=ax,
+            bbox={"alpha": 0.7, "color": "white", "pad": 0.08},
+        )
 
         decision_lines: List[Tuple[str, str]] = []
         decision_colors: List[str] = []
+        decision_summary = ""
         if inference is not None:
             split_palette = ["#f94144", "#f3722c", "#f9c74f", "#90be6d"]
             splits = inference["splits"]
@@ -306,13 +353,17 @@ class NetworkTopologyVisualizer:
                         decision_lines.append((es_node, rc_node))
                         decision_colors.append(color)
 
-                x, y = pos[rh_node]
-                ax.text(x, y - 0.08, f"S{split_idx + 1} -> ES{int(es_choices[rh_idx])}/RC{int(rc_choices[rh_idx])}", ha="center", va="top", fontsize=8, color=color, fontweight="bold")
-
             for (u, v), color in zip(decision_lines, decision_colors):
                 nx.draw_networkx_edges(graph, pos, edgelist=[(u, v)], ax=ax, edge_color=color, width=4.5, alpha=0.95)
 
             info = inference["info"]
+            split_counts = [int(np.sum(splits == split_idx)) for split_idx in range(4)]
+            invalid_text = ", ".join(info["invalid_reasons"][:3]) if info["invalid_reasons"] else "none"
+            decision_summary = (
+                f"Split counts: S1={split_counts[0]}  S2={split_counts[1]}  S3={split_counts[2]}  S4={split_counts[3]}\n"
+                f"Reconfig: split={info['split_changes']} es={info['es_changes']} rc={info['rc_changes']}\n"
+                f"Invalid reasons: {invalid_text}"
+            )
             title = (
                 f"Single Time-Slot Decision Snapshot | {env.topology_id} | "
                 f"valid={info['valid_deployment']} cost={info['deployment_cost']:.2f} "
@@ -337,10 +388,22 @@ class NetworkTopologyVisualizer:
                 ]
             )
 
-        ax.set_title(title, fontsize=15, fontweight="bold", pad=18)
-        ax.legend(handles=legend_handles, loc="upper left", fontsize=10, framealpha=0.95)
+        ax.set_title(title, fontsize=15, fontweight="bold", pad=16)
+        ax.legend(handles=legend_handles, loc="upper left", fontsize=9, framealpha=0.95, ncol=2)
+        if decision_summary:
+            ax.text(
+                1.02,
+                0.95,
+                decision_summary,
+                transform=ax.transAxes,
+                ha="left",
+                va="top",
+                fontsize=9,
+                bbox={"boxstyle": "round,pad=0.35", "facecolor": "white", "edgecolor": "#c8c8c8", "alpha": 0.95},
+            )
         ax.axis("off")
-        plt.tight_layout()
+        fig.subplots_adjust(right=0.78)
+        _finalize_figure(fig)
 
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches="tight", facecolor="white")
@@ -351,11 +414,11 @@ class NetworkTopologyVisualizer:
 
 class TrainingVisualization:
     @staticmethod
-    def plot_training_curves(json_path: str, save_path: str = None, figsize: Tuple = (15, 5)):
+    def plot_training_curves(json_path: str, save_path: str = None, figsize: Tuple = (16, 4.8)):
         with open(json_path, "r", encoding="utf-8") as file_obj:
             results = json.load(file_obj)
 
-        fig, axes = plt.subplots(1, 3, figsize=figsize, facecolor="white")
+        fig, axes = plt.subplots(1, 3, figsize=figsize, facecolor="white", constrained_layout=True)
         episodes = np.arange(len(results["episode_rewards"]))
         rewards = np.asarray(results["episode_rewards"], dtype=float)
         costs = np.asarray(results["episode_costs"], dtype=float)
@@ -368,7 +431,6 @@ class TrainingVisualization:
         cost_ma = uniform_filter1d(cost_fill, size=window, mode="nearest")
 
         axes[0].plot(episodes, rewards, linewidth=2.5, color="#e76f51", label="Reward")
-        axes[0].fill_between(episodes, rewards, alpha=0.25, color="#e76f51")
         axes[0].plot(episodes, reward_ma, linewidth=2.0, color="#7a1f1f", linestyle="--", label=f"MA({window})")
         axes[0].set_xlabel("Episode", fontsize=11, fontweight="bold")
         axes[0].set_ylabel("Cumulative Reward", fontsize=11, fontweight="bold")
@@ -377,7 +439,6 @@ class TrainingVisualization:
         axes[0].legend(loc="best")
 
         axes[1].plot(episodes, finite_costs, linewidth=2.5, color="#2a9d8f", label="Cost")
-        axes[1].fill_between(episodes, finite_costs, alpha=0.25, color="#2a9d8f")
         axes[1].plot(episodes, cost_ma, linewidth=2.0, color="#124f47", linestyle="--", label=f"MA({window})")
         axes[1].set_xlabel("Episode", fontsize=11, fontweight="bold")
         axes[1].set_ylabel("Deployment Cost", fontsize=11, fontweight="bold")
@@ -386,7 +447,6 @@ class TrainingVisualization:
         axes[1].legend(loc="best")
 
         axes[2].plot(episodes, validity_rate, linewidth=2.5, color="#457b9d", label="Validity")
-        axes[2].fill_between(episodes, validity_rate, alpha=0.25, color="#457b9d")
         axes[2].set_xlabel("Episode", fontsize=11, fontweight="bold")
         axes[2].set_ylabel("Valid Deployments (%)", fontsize=11, fontweight="bold")
         axes[2].set_title("Constraint Satisfaction", fontsize=12, fontweight="bold")
@@ -394,8 +454,7 @@ class TrainingVisualization:
         axes[2].grid(True, alpha=0.3)
         axes[2].legend(loc="best")
 
-        plt.suptitle("GPPO Training Progress", fontsize=14, fontweight="bold", y=1.02)
-        plt.tight_layout()
+        fig.suptitle("GPPO Training Progress", fontsize=14, fontweight="bold")
 
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches="tight", facecolor="white")
@@ -404,7 +463,7 @@ class TrainingVisualization:
         return fig, axes
 
     @staticmethod
-    def plot_split_usage(json_path: str, save_path: str = None, figsize: Tuple = (14, 5)):
+    def plot_split_usage(json_path: str, save_path: str = None, figsize: Tuple = (15, 5.2)):
         with open(json_path, "r", encoding="utf-8") as file_obj:
             results = json.load(file_obj)
 
@@ -433,7 +492,7 @@ class TrainingVisualization:
                         for key in split_labels
                     }
 
-        fig, axes = plt.subplots(1, 3, figsize=figsize, facecolor="white")
+        fig, axes = plt.subplots(1, 2, figsize=figsize, facecolor="white", constrained_layout=True)
         split_colors = ["#f94144", "#f3722c", "#f9c74f", "#90be6d"]
 
         training_values = np.asarray([training_totals[key] for key in split_labels], dtype=float)
@@ -444,40 +503,31 @@ class TrainingVisualization:
         axes[0].set_title("Training Split Usage", fontsize=12, fontweight="bold")
         axes[0].grid(True, axis="y", alpha=0.3)
 
-        if topology_totals:
-            topology_names = list(topology_totals.keys())
+        topology_source = eval_by_topology if eval_by_topology else {
+            topology_name: {
+                split_label: float(topology_totals[topology_name][split_label] / max(sum(topology_totals[topology_name].values()), 1.0))
+                for split_label in split_labels
+            }
+            for topology_name in topology_totals
+        }
+        if topology_source:
+            topology_names = list(topology_source.keys())
             x = np.arange(len(topology_names))
             bottom = np.zeros(len(topology_names), dtype=float)
             for split_idx, split_label in enumerate(split_labels):
-                values = np.asarray([topology_totals[name][split_label] for name in topology_names], dtype=float)
-                total = np.asarray([sum(topology_totals[name].values()) for name in topology_names], dtype=float)
-                freq = np.divide(values, np.maximum(total, 1.0))
-                axes[1].bar(x, freq, bottom=bottom, color=split_colors[split_idx], edgecolor="black", linewidth=1.0, label=split_label)
-                bottom += freq
-            axes[1].set_xticks(x)
-            axes[1].set_xticklabels(topology_names, rotation=25, ha="right")
-            axes[1].set_ylim([0, 1])
-            axes[1].set_title("Training Usage by Topology", fontsize=12, fontweight="bold")
-            axes[1].grid(True, axis="y", alpha=0.3)
-            axes[1].legend(loc="best")
-
-        if eval_by_topology:
-            topology_names = list(eval_by_topology.keys())
-            x = np.arange(len(topology_names))
-            bottom = np.zeros(len(topology_names), dtype=float)
-            for split_idx, split_label in enumerate(split_labels):
-                values = np.asarray([eval_by_topology[name][split_label] for name in topology_names], dtype=float)
-                axes[2].bar(x, values, bottom=bottom, color=split_colors[split_idx], edgecolor="black", linewidth=1.0, label=split_label)
+                values = np.asarray([topology_source[name][split_label] for name in topology_names], dtype=float)
+                axes[1].bar(x, values, bottom=bottom, color=split_colors[split_idx], edgecolor="black", linewidth=1.0, label=split_label)
                 bottom += values
-            axes[2].set_xticks(x)
-            axes[2].set_xticklabels(topology_names, rotation=25, ha="right")
-            axes[2].set_ylim([0, 1])
-            axes[2].set_title("Evaluation Usage by Topology", fontsize=12, fontweight="bold")
-            axes[2].grid(True, axis="y", alpha=0.3)
-            axes[2].legend(loc="best")
+            _apply_category_ticks(axes[1], topology_names, rotation=28, limit=18)
+            axes[1].set_ylim([0, 1])
+            axes[1].set_title("Split Usage by Topology", fontsize=12, fontweight="bold")
+            axes[1].grid(True, axis="y", alpha=0.3)
+            axes[1].legend(loc="upper right", ncol=2, fontsize=9)
+        else:
+            axes[1].text(0.5, 0.5, "No topology split data", ha="center", va="center", transform=axes[1].transAxes)
+            axes[1].axis("off")
 
-        plt.suptitle("Policy-Derived Split Usage", fontsize=14, fontweight="bold", y=1.02)
-        plt.tight_layout()
+        fig.suptitle("Policy-Derived Split Usage", fontsize=14, fontweight="bold")
 
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches="tight", facecolor="white")
@@ -578,7 +628,7 @@ class TrainingVisualization:
         return fig, ax
 
     @staticmethod
-    def plot_evaluation_topology_summary(json_path: str, save_path: str = None, figsize: Tuple = (15, 6)):
+    def plot_evaluation_topology_summary(json_path: str, save_path: str = None, figsize: Tuple = (17, 7)):
         with open(json_path, "r", encoding="utf-8") as file_obj:
             results = json.load(file_obj)
 
@@ -596,9 +646,9 @@ class TrainingVisualization:
                         "sla_penalty": float(per_topology.get("sla_penalty", 0.0)),
                     })
 
-        fig, axes = plt.subplots(1, 4, figsize=figsize, facecolor="white")
+        fig, axes = plt.subplots(2, 2, figsize=figsize, facecolor="white", constrained_layout=True)
         if not topology_rows:
-            for ax in axes:
+            for ax in axes.flat:
                 ax.text(0.5, 0.5, "No evaluation data", ha="center", va="center", transform=ax.transAxes)
                 ax.axis("off")
             return fig, axes
@@ -613,18 +663,16 @@ class TrainingVisualization:
             ("sla_penalty", "SLA Penalty"),
         ]
 
-        for ax, (metric_key, title) in zip(axes, metric_specs):
+        for ax, (metric_key, title) in zip(axes.flat, metric_specs):
             values = [row[metric_key] for row in topology_rows]
             ax.bar(x, values, color=colors, edgecolor="black", linewidth=1.0)
-            ax.set_xticks(x)
-            ax.set_xticklabels(topology_names, rotation=25, ha="right")
+            _apply_category_ticks(ax, topology_names, rotation=30, limit=18)
             ax.set_title(title, fontsize=12, fontweight="bold")
             ax.grid(True, axis="y", alpha=0.3)
             if metric_key == "validity_rate":
                 ax.set_ylim([0, 1.05])
 
-        plt.suptitle("Train vs Test Topology Evaluation Summary", fontsize=14, fontweight="bold", y=1.02)
-        plt.tight_layout()
+        fig.suptitle("Train vs Test Topology Evaluation Summary", fontsize=14, fontweight="bold")
 
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches="tight", facecolor="white")
@@ -633,9 +681,9 @@ class TrainingVisualization:
         return fig, axes
 
     @staticmethod
-    def plot_training_metrics_from_csv(csv_path: str, save_path: str = None, figsize: Tuple = (16, 10)):
+    def plot_training_metrics_from_csv(csv_path: str, save_path: str = None, figsize: Tuple = (16, 4.8)):
         rows = _load_csv_rows(csv_path)
-        required = ["episode", "reward", "cost", "valid_rate", "total_reconfig_changes"]
+        required = ["episode", "reward", "cost", "valid_rate"]
         if not _csv_has_columns(rows, required):
             return _skip_plot(save_path or csv_path, f"missing required columns: {required}")
 
@@ -643,14 +691,12 @@ class TrainingVisualization:
         rewards = np.asarray([_maybe_float(row["reward"]) for row in rows], dtype=float)
         costs = np.asarray([_maybe_float(row["cost"]) for row in rows], dtype=float)
         valid_rate = np.asarray([100.0 * _maybe_float(row["valid_rate"]) for row in rows], dtype=float)
-        reconfig = np.asarray([_maybe_float(row["total_reconfig_changes"]) for row in rows], dtype=float)
 
-        fig, axes = plt.subplots(2, 2, figsize=figsize, facecolor="white")
+        fig, axes = plt.subplots(1, 3, figsize=figsize, facecolor="white", constrained_layout=True)
         metric_specs = [
             (rewards, "Reward vs Episode", "Reward", "#e76f51", True),
             (np.where(np.isfinite(costs), costs, np.nan), "Cost vs Episode", "Cost", "#2a9d8f", True),
             (valid_rate, "Valid Rate vs Episode", "Valid Rate (%)", "#457b9d", False),
-            (reconfig, "Reconfiguration Changes vs Episode", "Total Reconfig Changes", "#f4a261", True),
         ]
 
         for ax, (values, title, ylabel, color, smooth) in zip(axes.flat, metric_specs):
@@ -662,14 +708,13 @@ class TrainingVisualization:
             ax.set_ylabel(ylabel, fontsize=11, fontweight="bold")
             ax.grid(True, alpha=0.3)
 
-        plt.tight_layout()
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches="tight", facecolor="white")
             print(f"✓ Saved: {save_path}")
         return fig, axes
 
     @staticmethod
-    def plot_cost_components_from_csv(csv_path: str, save_path: str = None, figsize: Tuple = (14, 6)):
+    def plot_cost_components_from_csv(csv_path: str, save_path: str = None, figsize: Tuple = (14, 5.5)):
         rows = _load_csv_rows(csv_path)
         labels = ["processing_cost", "routing_cost", "reconfiguration_cost", "sla_penalty"]
         required = ["episode", *labels]
@@ -677,17 +722,22 @@ class TrainingVisualization:
             return _skip_plot(save_path or csv_path, f"missing required columns: {required}")
 
         episodes = np.asarray([_maybe_float(row["episode"]) for row in rows], dtype=float)
-        fig, ax = plt.subplots(figsize=figsize, facecolor="white")
+        fig, ax = plt.subplots(figsize=figsize, facecolor="white", constrained_layout=True)
         colors = ["#e76f51", "#2a9d8f", "#e9c46a", "#457b9d"]
+        label_map = {
+            "processing_cost": "Processing",
+            "routing_cost": "Routing",
+            "reconfiguration_cost": "Reconfig",
+            "sla_penalty": "SLA",
+        }
         for label, color in zip(labels, colors):
             values = np.asarray([_maybe_float(row[label]) for row in rows], dtype=float)
-            ax.plot(episodes, _moving_average(values), linewidth=2.2, label=label, color=color)
+            ax.plot(episodes, _moving_average(values), linewidth=2.2, label=label_map[label], color=color)
         ax.set_title("Cost Component Trends", fontsize=13, fontweight="bold")
         ax.set_xlabel("Episode", fontsize=11, fontweight="bold")
         ax.set_ylabel("Cost", fontsize=11, fontweight="bold")
         ax.grid(True, alpha=0.3)
-        ax.legend(loc="best")
-        plt.tight_layout()
+        ax.legend(loc="upper right", ncol=4, fontsize=9)
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches="tight", facecolor="white")
             print(f"✓ Saved: {save_path}")
@@ -722,7 +772,7 @@ class TrainingVisualization:
         return fig, ax
 
     @staticmethod
-    def plot_evaluation_topology_summary_from_csv(csv_path: str, save_path: str = None, figsize: Tuple = (16, 8)):
+    def plot_evaluation_topology_summary_from_csv(csv_path: str, save_path: str = None, figsize: Tuple = (17, 8)):
         rows = _load_csv_rows(csv_path)
         required = ["topology_id", "pool_type", "avg_reward", "avg_cost", "valid_rate", "avg_sla_penalty"]
         if not _csv_has_columns(rows, required):
@@ -732,7 +782,7 @@ class TrainingVisualization:
         pool_types = [row["pool_type"] for row in rows]
         x = np.arange(len(rows))
         colors = ["#e76f51" if pool == "train" else "#457b9d" for pool in pool_types]
-        fig, axes = plt.subplots(2, 2, figsize=figsize, facecolor="white")
+        fig, axes = plt.subplots(2, 2, figsize=figsize, facecolor="white", constrained_layout=True)
         metric_specs = [
             ("avg_reward", "Average Reward"),
             ("avg_cost", "Average Cost"),
@@ -744,11 +794,9 @@ class TrainingVisualization:
             if column == "valid_rate":
                 values = 100.0 * values
             ax.bar(x, values, color=colors, edgecolor="black", linewidth=1.0)
-            ax.set_xticks(x)
-            ax.set_xticklabels(topology_ids, rotation=25, ha="right")
+            _apply_category_ticks(ax, topology_ids, rotation=30, limit=18)
             ax.set_title(title, fontsize=12, fontweight="bold")
             ax.grid(True, axis="y", alpha=0.3)
-        plt.tight_layout()
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches="tight", facecolor="white")
             print(f"✓ Saved: {save_path}")
@@ -845,11 +893,11 @@ class TrainingVisualization:
         return fig, ax
 
     @staticmethod
-    def plot_episode_trace_from_csv(csv_path: str, save_path: str = None, figsize: Tuple = (16, 10)):
+    def plot_episode_trace_from_csv(csv_path: str, save_path: str = None, figsize: Tuple = (15, 8)):
         rows = _load_csv_rows(csv_path)
         required = [
-            "slot", "deployment_cost", "reward", "reconfiguration_cost", "split_changes",
-            "es_changes", "rc_changes", "e2e_violation", "crosshaul_violation", "invalid_reasons"
+            "slot", "deployment_cost", "reward", "reconfiguration_cost",
+            "e2e_violation", "crosshaul_violation", "invalid_reasons"
         ]
         if not _csv_has_columns(rows, required):
             return _skip_plot(save_path or csv_path, f"missing required columns: {required}")
@@ -858,23 +906,18 @@ class TrainingVisualization:
         deployment_cost = np.asarray([_maybe_float(row["deployment_cost"]) for row in rows], dtype=float)
         reward = np.asarray([_maybe_float(row["reward"]) for row in rows], dtype=float)
         reconfig_cost = np.asarray([_maybe_float(row["reconfiguration_cost"]) for row in rows], dtype=float)
-        split_changes = np.asarray([_maybe_float(row["split_changes"]) for row in rows], dtype=float)
-        es_changes = np.asarray([_maybe_float(row["es_changes"]) for row in rows], dtype=float)
-        rc_changes = np.asarray([_maybe_float(row["rc_changes"]) for row in rows], dtype=float)
         e2e = np.asarray([_maybe_float(row["e2e_violation"]) for row in rows], dtype=float)
         crosshaul = np.asarray([_maybe_float(row["crosshaul_violation"]) for row in rows], dtype=float)
         invalid_mask = np.asarray([1.0 if row["invalid_reasons"] else 0.0 for row in rows], dtype=float)
 
-        fig, axes = plt.subplots(3, 2, figsize=figsize, facecolor="white")
+        fig, axes = plt.subplots(2, 2, figsize=figsize, facecolor="white", constrained_layout=True)
         series = [
             (deployment_cost, "Deployment Cost per Slot", "Cost", "#2a9d8f"),
             (reward, "Reward per Slot", "Reward", "#e76f51"),
             (reconfig_cost, "Reconfiguration Cost per Slot", "Reconfig Cost", "#f4a261"),
-            (split_changes + es_changes + rc_changes, "Total Reconfiguration Changes", "Changes", "#457b9d"),
-            (e2e, "E2E Violation per Slot", "Violation", "#9d4edd"),
-            (crosshaul, "Crosshaul Violation per Slot", "Violation", "#264653"),
+            (e2e, "Latency Violations per Slot", "Violation", "#9d4edd"),
         ]
-        for ax, (values, title, ylabel, color) in zip(axes.flat, series):
+        for ax, (values, title, ylabel, color) in zip(axes.flat[:3], series):
             plot_values = np.where(np.isfinite(values), values, np.nan)
             ax.plot(slots, plot_values, linewidth=2.0, color=color)
             flagged_x = slots[invalid_mask > 0]
@@ -886,7 +929,17 @@ class TrainingVisualization:
             ax.set_ylabel(ylabel, fontsize=10, fontweight="bold")
             ax.grid(True, alpha=0.3)
 
-        plt.tight_layout()
+        latency_ax = axes.flat[3]
+        latency_ax.plot(slots, np.where(np.isfinite(e2e), e2e, np.nan), linewidth=2.0, color="#9d4edd", label="E2E")
+        latency_ax.plot(slots, np.where(np.isfinite(crosshaul), crosshaul, np.nan), linewidth=2.0, color="#264653", label="Crosshaul")
+        if np.any(invalid_mask > 0):
+            latency_ax.scatter(slots[invalid_mask > 0], np.zeros(np.count_nonzero(invalid_mask > 0)), s=14, color="#d00000", alpha=0.5)
+        latency_ax.set_title("E2E / Crosshaul Violation per Slot", fontsize=11, fontweight="bold")
+        latency_ax.set_xlabel("Slot", fontsize=10, fontweight="bold")
+        latency_ax.set_ylabel("Violation", fontsize=10, fontweight="bold")
+        latency_ax.grid(True, alpha=0.3)
+        latency_ax.legend(loc="upper right", fontsize=9)
+
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches="tight", facecolor="white")
             print(f"✓ Saved: {save_path}")
@@ -972,7 +1025,7 @@ class ActionSpaceVisualizer:
 
 class CostBreakdownVisualizer:
     @staticmethod
-    def plot_cost_components(json_path: str, save_path: str = None, figsize: Tuple = (12, 6)):
+    def plot_cost_components(json_path: str, save_path: str = None, figsize: Tuple = (11, 5)):
         with open(json_path, "r", encoding="utf-8") as file_obj:
             results = json.load(file_obj)
 
@@ -982,29 +1035,22 @@ class CostBreakdownVisualizer:
         values = [float(cost_breakdown.get(label, 0.0)) for label in labels]
         colors = ["#e76f51", "#2a9d8f", "#e9c46a", "#457b9d"]
 
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize, facecolor="white")
-        bars = ax1.bar(labels, values, color=colors, edgecolor="black", linewidth=1.5)
-        ax1.set_ylabel("Average Cost Per Episode", fontsize=11, fontweight="bold")
-        ax1.set_title("Observed Cost Breakdown", fontsize=12, fontweight="bold")
-        ax1.set_xticks(np.arange(len(labels)))
-        ax1.set_xticklabels(labels, rotation=25, ha="right")
-        ax1.grid(True, axis="y", alpha=0.3)
+        display_labels = ["Processing", "Routing", "Reconfig", "SLA"]
+        fig, ax = plt.subplots(figsize=figsize, facecolor="white", constrained_layout=True)
+        bars = ax.bar(display_labels, values, color=colors, edgecolor="black", linewidth=1.2)
+        ax.set_ylabel("Average Cost Per Episode", fontsize=11, fontweight="bold")
+        ax.set_title("Observed Cost Breakdown", fontsize=13, fontweight="bold")
+        ax.grid(True, axis="y", alpha=0.3)
 
         for bar in bars:
             height = bar.get_height()
-            ax1.text(bar.get_x() + bar.get_width() / 2.0, height, f"{height:.2f}", ha="center", va="bottom", fontweight="bold")
-
-        ax2.pie(values, labels=labels, autopct="%1.1f%%", colors=colors, startangle=90, wedgeprops={"edgecolor": "black", "linewidth": 1.5})
-        ax2.set_title("Relative Observed Cost Distribution", fontsize=12, fontweight="bold")
-
-        plt.suptitle("Policy-Derived Cost Analysis", fontsize=13, fontweight="bold", y=0.98)
-        plt.tight_layout()
+            ax.text(bar.get_x() + bar.get_width() / 2.0, height, f"{height:.2f}", ha="center", va="bottom", fontweight="bold")
 
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches="tight", facecolor="white")
             print(f"✓ Saved: {save_path}")
 
-        return fig, (ax1, ax2)
+        return fig, ax
 
 
 class PerformanceComparison:

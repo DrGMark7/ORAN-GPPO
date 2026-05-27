@@ -1,0 +1,120 @@
+============================================================
+Training Complete!
+Final Average Reward: 8.917
+Final Average Cost: 36.520
+Final Valid Deployment Rate: 85.8%
+Final Topologies Seen: ['small_balanced_train_a', 'small_clustered_train_b']
+Training Split Usage: S1=64071, S2=160139, S3=676113, S4=95485
+GNN Verification: saved=True delta_l2=1.109025
+Strict-Feasible Reset Rate: 58.1%
+Exact Strict-Feasible Reset Rate: 58.1%
+Episodes With No Strict-Valid Action: 41.9%
+Invalid Counts By Reason: es_capacity_exceeded=10274, e2e_latency_exceeded=5294, crosshaul_latency_exceeded=10274
+Invalid Reason Percent Of Time Slots: es_capacity_exceeded=8.3%, e2e_latency_exceeded=4.3%, crosshaul_latency_exceeded=8.3%
+Average Consecutive-Slot Reconfiguration: split=1.258, es=0.802, rc=1.136, total=3.195
+Reconfiguration Cost Share Of Total Cost: 7.13%
+Timing Profile (s): total=261.440, reset=13.025, graph=9.241, gnn=56.406, action=122.487, env_step=19.699, ppo_update=29.897
+small_balanced_train_a strict link-delay rules out splits: S3
+small_clustered_train_b strict link-delay rules out splits: S3
+============================================================
+
+============================================================
+Evaluation Results (train pool)
+============================================================
+Project Benchmark: small
+Constraint Mode: strict_connectivity_plus_capacity
+Time Slots Per Episode: 50
+Topologies: ['small_balanced_train_a']
+Structural Validity Rate At Reset: 100.0%
+Strict-Feasible Reset Rate: 0.0%
+Exact Strict-Feasible Rate At Reset: 0.0%
+Episodes With No Strict-Valid Action: 100.0%
+Valid Deployment Rate: 88.0%
+Average Reward: 9.515 ± 0.000
+Average Cost: 31.646 ± 0.000
+Average Consecutive-Slot Reconfiguration: split=0.000, es=0.000, rc=0.000, total=0.000
+Reconfiguration Cost Share Of Total Cost: 0.00%
+small_balanced_train_a | reward=9.515 cost=31.646 valid=88.0% strict_reset=0.0% sla=6.126 | S1=0.0%, S2=25.0%, S3=62.5%, S4=12.5%
+  link-delay rules out strict splits: S3
+============================================================
+
+============================================================
+Evaluation Results (train pool)
+============================================================
+Project Benchmark: small
+Constraint Mode: strict_connectivity_plus_capacity
+Time Slots Per Episode: 50
+Topologies: ['small_clustered_train_b']
+Structural Validity Rate At Reset: 100.0%
+Strict-Feasible Reset Rate: 0.0%
+Exact Strict-Feasible Rate At Reset: 0.0%
+Episodes With No Strict-Valid Action: 100.0%
+Valid Deployment Rate: 88.0%
+Average Reward: 9.203 ± 0.000
+Average Cost: 36.767 ± 0.000
+Average Consecutive-Slot Reconfiguration: split=0.000, es=0.000, rc=0.000, total=0.000
+Reconfiguration Cost Share Of Total Cost: 0.00%
+small_clustered_train_b | reward=9.203 cost=36.767 valid=88.0% strict_reset=0.0% sla=6.979 | S1=0.0%, S2=37.5%, S3=50.0%, S4=12.5%
+  link-delay rules out strict splits: S3
+============================================================
+
+============================================================
+Evaluation Results (test pool)
+============================================================
+Project Benchmark: small
+Constraint Mode: strict_connectivity_plus_capacity
+Time Slots Per Episode: 50
+Topologies: ['small_sparse_test_a']
+Structural Validity Rate At Reset: 100.0%
+Strict-Feasible Reset Rate: 0.0%
+Exact Strict-Feasible Rate At Reset: 0.0%
+Episodes With No Strict-Valid Action: 100.0%
+Valid Deployment Rate: 88.0%
+Average Reward: 8.727 ± 0.000
+Average Cost: 45.837 ± 0.000
+Average Consecutive-Slot Reconfiguration: split=0.000, es=0.000, rc=0.000, total=0.000
+Reconfiguration Cost Share Of Total Cost: 0.00%
+small_sparse_test_a | reward=8.727 cost=45.837 valid=88.0% strict_reset=0.0% sla=20.254 | S1=0.0%, S2=37.5%, S3=62.5%, S4=0.0%
+  link-delay rules out strict splits: S2, S3
+============================================================
+
+============================================================
+Evaluation Results (test pool)
+============================================================
+Project Benchmark: small
+Constraint Mode: strict_connectivity_plus_capacity
+Time Slots Per Episode: 50
+Topologies: ['small_direct_test_b']
+Structural Validity Rate At Reset: 100.0%
+Strict-Feasible Reset Rate: 0.0%
+Exact Strict-Feasible Rate At Reset: 0.0%
+Episodes With No Strict-Valid Action: 100.0%
+Valid Deployment Rate: 88.0%
+Average Reward: 9.334 ± 0.000
+Average Cost: 34.062 ± 0.000
+Average Consecutive-Slot Reconfiguration: split=0.000, es=0.000, rc=0.000, total=0.000
+Reconfiguration Cost Share Of Total Cost: 0.00%
+small_direct_test_b | reward=9.334 cost=34.062 valid=88.0% strict_reset=0.0% sla=9.697 | S1=0.0%, S2=37.5%, S3=62.5%, S4=0.0%
+  link-delay rules out strict splits: S3
+============================================================
+
+============================================================
+Staged Constraint Comparison
+============================================================
+train_pool:
+  small_balanced_train_a | legacy_valid=100.0% strict_valid=0.0% gap=100.0% strict_no_action=100.0% first_fail=strict_connectivity_plus_capacity
+  small_clustered_train_b | legacy_valid=100.0% strict_valid=0.0% gap=100.0% strict_no_action=100.0% first_fail=strict_connectivity_plus_capacity
+test_pool:
+  small_sparse_test_a | legacy_valid=100.0% strict_valid=0.0% gap=100.0% strict_no_action=100.0% first_fail=strict_connectivity_plus_capacity
+  small_direct_test_b | legacy_valid=100.0% strict_valid=0.0% gap=100.0% strict_no_action=100.0% first_fail=strict_connectivity_plus_capacity
+
+CSV Exports
+training_episode_metrics: outputs/small_strict_connectivity_plus_capacity/training_episode_metrics.csv
+evaluation_topology_summary: outputs/small_strict_connectivity_plus_capacity/evaluation_topology_summary.csv
+invalid_reason_summary: outputs/small_strict_connectivity_plus_capacity/invalid_reason_summary.csv
+timing_profile: outputs/small_strict_connectivity_plus_capacity/timing_profile.csv
+episode_trace_csvs:
+  outputs/small_strict_connectivity_plus_capacity/train_small_balanced_train_a_strict_connectivity_plus_capacity_episode_000.csv
+  outputs/small_strict_connectivity_plus_capacity/train_small_clustered_train_b_strict_connectivity_plus_capacity_episode_000.csv
+  outputs/small_strict_connectivity_plus_capacity/test_small_sparse_test_a_strict_connectivity_plus_capacity_episode_000.csv
+  outputs/small_strict_connectivity_plus_capacity/test_small_direct_test_b_strict_connectivity_plus_capacity_episode_000.csv

@@ -1,0 +1,5 @@
+topology_id,benchmark,pool_type,constraint_mode,avg_reward,std_reward,avg_cost,std_cost,valid_rate,structural_validity_rate_at_reset,strict_feasible_rate_at_reset,avg_processing_cost,avg_routing_cost,avg_reconfiguration_cost,avg_sla_penalty,split_s1_pct,split_s2_pct,split_s3_pct,split_s4_pct
+small_balanced_train_a,small,train,strict_connectivity_plus_capacity_plus_bandwidth,11.661514650689956,0.0,27.113779029846192,0.0,1.0,1.0,0.0,17.411175508499145,1.7468160218463205,0.0,7.9557875061035155,0.0,0.25,0.75,0.0
+small_clustered_train_b,small,train,strict_connectivity_plus_capacity_plus_bandwidth,11.239757132700506,0.0,32.38505729675293,0.0,1.0,1.0,0.0,23.61254898071289,1.492372319173306,0.0,7.280135946273804,0.0,0.25,0.625,0.125
+small_sparse_test_a,small,test,strict_connectivity_plus_capacity_plus_bandwidth,10.706197291352948,0.0,39.103881912231444,0.0,1.0,1.0,0.0,17.411175508499145,3.061357352014576,0.0,18.631349143981932,0.0,0.25,0.75,0.0
+small_direct_test_b,small,test,strict_connectivity_plus_capacity_plus_bandwidth,11.71971528049784,0.0,26.488750858306886,0.0,1.0,1.0,0.0,17.411175508499145,1.6191401518884667,0.26,7.1984350204467775,0.0,0.25,0.75,0.0

@@ -1,0 +1,7 @@
+scope,pool_type,topology_id,constraint_mode,missing_direct_rc_link,missing_rh_es_link,missing_es_rc_link,es_capacity_exceeded,rc_capacity_exceeded,bandwidth_exceeded,e2e_latency_exceeded,crosshaul_latency_exceeded
+train,train,small_balanced_train_a,strict_full,0,0,0,3615,0,0,2652,6030
+train,train,small_clustered_train_b,strict_full,0,0,0,3900,0,0,3568,6470
+eval,train,small_balanced_train_a,strict_full,0,0,0,3,0,0,4,5
+eval,train,small_clustered_train_b,strict_full,0,0,0,3,0,0,2,5
+eval,test,small_sparse_test_a,strict_full,0,0,0,4,0,0,5,5
+eval,test,small_direct_test_b,strict_full,0,0,0,4,0,0,5,5

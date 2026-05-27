@@ -8,7 +8,15 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from src.common.paths import DEFAULT_CHECKPOINT_PATH, DEFAULT_RESULTS_PATH, EPISODE_TRACES_DIR, ensure_output_dirs
+from src.common.paths import (
+    DEFAULT_RUN_DIR,
+    DEFAULT_CHECKPOINT_PATH,
+    DEFAULT_RESULTS_PATH,
+    ensure_output_dirs,
+    resolve_checkpoint_path,
+    resolve_episode_traces_dir,
+    resolve_results_path,
+)
 from src.core import (
     DEFAULT_BENCHMARK_TOPOLOGY_POOLS,
     ExperimentConfig,
@@ -72,13 +80,14 @@ def _zero_timing_stats() -> Dict[str, float]:
 
 def _episode_trace_path(
     *,
+    trace_output_dir: Path,
     topology_pool_name: str,
     topology_id: str,
     constraint_mode: str,
     episode_index: int,
 ) -> Path:
     safe_mode = constraint_mode.replace("/", "_")
-    return EPISODE_TRACES_DIR / f"{topology_pool_name}_{topology_id}_{safe_mode}_episode_{episode_index:03d}.json"
+    return trace_output_dir / f"{topology_pool_name}_{topology_id}_{safe_mode}_episode_{episode_index:03d}.json"
 
 
 def _write_episode_trace(
@@ -863,6 +872,7 @@ def evaluate_gppo(
     export_episode_traces: bool = True,
     verbose: bool = True,
     csv_output_dir: Optional[Path] = None,
+    trace_output_dir: Optional[Path] = None,
     include_node_index: bool = False,
 ) -> Dict[str, object]:
     env = _build_env(
@@ -1050,6 +1060,7 @@ def evaluate_gppo(
         )
         if export_episode_traces:
             trace_path = _episode_trace_path(
+                trace_output_dir=trace_output_dir or resolve_episode_traces_dir(DEFAULT_RESULTS_PATH),
                 topology_pool_name=topology_pool_name,
                 topology_id=reset_info["topology_id"],
                 constraint_mode=constraint_mode,
@@ -1262,6 +1273,7 @@ def evaluate_pool_by_topology(
     constraint_mode: str,
     max_steps: int,
     csv_output_dir: Optional[Path] = None,
+    trace_output_dir: Optional[Path] = None,
     include_node_index: bool = False,
 ) -> Dict[str, object]:
     topology_ids = DEFAULT_BENCHMARK_TOPOLOGY_POOLS[benchmark][topology_pool_name]
@@ -1279,6 +1291,7 @@ def evaluate_pool_by_topology(
             topology_id=topology_id,
             max_steps=max_steps,
             csv_output_dir=csv_output_dir,
+            trace_output_dir=trace_output_dir,
             include_node_index=include_node_index,
         )
     return summaries
@@ -1381,8 +1394,8 @@ def build_train_parser() -> argparse.ArgumentParser:
     parser.add_argument("--paper-num-seeds", type=int, default=PAPER_NUM_SEEDS, help="Paper-mode random seeds for aggregate reporting")
     parser.add_argument("--paper-gnn-hidden-dim", type=int, default=PAPER_GNN_HIDDEN_DIM, help="Paper-mode GNN hidden size")
     parser.add_argument("--batch-size", type=int, default=128, help="PPO batch size")
-    parser.add_argument("--results-path", type=Path, default=DEFAULT_RESULTS_PATH, help="Output JSON path")
-    parser.add_argument("--checkpoint-path", type=Path, default=DEFAULT_CHECKPOINT_PATH, help="Output checkpoint path")
+    parser.add_argument("--results-path", type=Path, default=DEFAULT_RUN_DIR, help="Run directory or output JSON path")
+    parser.add_argument("--checkpoint-path", type=Path, default=DEFAULT_CHECKPOINT_PATH, help="Checkpoint file path or directory")
     parser.add_argument("--skip-eval", action="store_true", help="Skip post-training evaluation")
     parser.add_argument("--eval-episodes", type=int, default=1, help="Number of evaluation episodes per pool")
     parser.add_argument(
@@ -1409,7 +1422,13 @@ def build_train_parser() -> argparse.ArgumentParser:
 
 
 def run_training_from_args(args: argparse.Namespace) -> None:
+    resolved_results_path = resolve_results_path(args.results_path)
+    resolved_checkpoint_path = resolve_checkpoint_path(args.results_path, args.checkpoint_path)
+    resolved_trace_output_dir = resolve_episode_traces_dir(args.results_path)
+
     if args.paper_mode:
+        args.results_path = resolved_results_path
+        args.checkpoint_path = resolved_checkpoint_path
         _run_paper_mode_from_args(args)
         return
 
@@ -1420,8 +1439,8 @@ def run_training_from_args(args: argparse.Namespace) -> None:
         batch_size=args.batch_size,
         device=args.device,
         seed=args.seed,
-        results_path=args.results_path,
-        checkpoint_path=args.checkpoint_path,
+        results_path=resolved_results_path,
+        checkpoint_path=resolved_checkpoint_path,
         benchmark=args.benchmark,
         topology_selection_mode=args.topology_selection_mode,
         constraint_mode=args.constraint_mode,
@@ -1438,7 +1457,8 @@ def run_training_from_args(args: argparse.Namespace) -> None:
             device=args.device,
             constraint_mode=args.constraint_mode,
             max_steps=effective_max_steps,
-            csv_output_dir=args.results_path.parent,
+            csv_output_dir=resolved_results_path.parent,
+            trace_output_dir=resolved_trace_output_dir,
         )
         train_eval_done = time.perf_counter()
         test_eval = evaluate_pool_by_topology(
@@ -1450,7 +1470,8 @@ def run_training_from_args(args: argparse.Namespace) -> None:
             device=args.device,
             constraint_mode=args.constraint_mode,
             max_steps=effective_max_steps,
-            csv_output_dir=args.results_path.parent,
+            csv_output_dir=resolved_results_path.parent,
+            trace_output_dir=resolved_trace_output_dir,
         )
         eval_done = time.perf_counter()
         results["evaluation"] = {
@@ -1510,7 +1531,7 @@ def run_training_from_args(args: argparse.Namespace) -> None:
                             f"cost={mode_summary['avg_cost']:.3f} "
                             f"invalid={invalid_text}"
                         )
-    csv_paths = _export_csv_artifacts(results, args.results_path)
+    csv_paths = _export_csv_artifacts(results, resolved_results_path)
     trace_csv_paths = []
     for pool_results in results.get("evaluation", {}).values():
         for topology_eval in pool_results.values():
@@ -1519,7 +1540,7 @@ def run_training_from_args(args: argparse.Namespace) -> None:
         csv_paths["episode_trace_csvs"] = trace_csv_paths
     results["csv_exports"] = csv_paths
 
-    with args.results_path.open("w", encoding="utf-8") as file_obj:
+    with resolved_results_path.open("w", encoding="utf-8") as file_obj:
         json.dump(results, file_obj, indent=2)
 
     print("\nCSV Exports")

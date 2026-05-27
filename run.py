@@ -5,7 +5,7 @@ from src.common.paths import DEFAULT_RESULTS_PATH
 from src.visualization.animation import create_all_animations
 from src.workflows.demo import run_demo
 from src.workflows.training import build_train_parser, run_training_from_args
-from src.workflows.visualize import generate_all_visualizations
+from src.workflows.visualize import build_visualize_parser, generate_all_visualizations
 
 
 def main(argv=None) -> None:
@@ -30,7 +30,21 @@ def main(argv=None) -> None:
         run_training_from_args(train_args)
         return
     if args.task == "visualize":
-        generate_all_visualizations()
+        if args.results_path is not None:
+            remaining = ["--results-path", str(args.results_path), *remaining]
+        visualize_args = build_visualize_parser().parse_args(remaining)
+        mode = "compact"
+        if visualize_args.full_visualization:
+            mode = "full"
+        elif visualize_args.topology_only:
+            mode = "topology"
+        elif visualize_args.csv_only:
+            mode = "csv"
+        generate_all_visualizations(
+            results_path=visualize_args.results_path,
+            checkpoint_path=visualize_args.checkpoint_path,
+            mode=mode,
+        )
         return
     results_path = args.results_path if args.results_path is not None else None
     create_all_animations(

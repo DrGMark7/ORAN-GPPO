@@ -1,6 +1,7 @@
 *.pyc
 __pycache__/
-outputs/*
+outputs/*.pt
+outputs/episode_traces
 .vscode/*
 
 INSTRUCTION.md

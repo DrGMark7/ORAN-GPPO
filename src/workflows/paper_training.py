@@ -6,6 +6,7 @@ from typing import Dict, List
 
 import numpy as np
 
+from src.common.paths import resolve_checkpoint_path, resolve_results_path
 from src.workflows.training_constants import PAPER_GNN_INPUT_DIM, PAPER_TIME_SLOTS_PER_EPISODE
 from src.workflows.training_csv import _export_csv_artifacts
 
@@ -104,8 +105,8 @@ def _run_paper_mode_from_args(args: argparse.Namespace) -> None:
     from src.workflows.training import evaluate_pool_by_topology, train_gppo
 
     benchmark = _paper_benchmark_name(args.benchmark)
-    base_results_path = args.results_path
-    base_checkpoint_path = args.checkpoint_path
+    base_results_path = resolve_results_path(args.results_path)
+    base_checkpoint_path = resolve_checkpoint_path(args.results_path, args.checkpoint_path)
     seed_results: List[Dict[str, object]] = []
     seed_output_dir = base_results_path.parent / "paper_runs"
     seed_output_dir.mkdir(parents=True, exist_ok=True)
@@ -145,6 +146,7 @@ def _run_paper_mode_from_args(args: argparse.Namespace) -> None:
                 constraint_mode=args.constraint_mode,
                 max_steps=PAPER_TIME_SLOTS_PER_EPISODE,
                 csv_output_dir=seed_output_dir,
+                trace_output_dir=seed_output_dir / "episode_traces",
                 include_node_index=True,
             )
             test_eval = evaluate_pool_by_topology(
@@ -157,6 +159,7 @@ def _run_paper_mode_from_args(args: argparse.Namespace) -> None:
                 constraint_mode=args.constraint_mode,
                 max_steps=PAPER_TIME_SLOTS_PER_EPISODE,
                 csv_output_dir=seed_output_dir,
+                trace_output_dir=seed_output_dir / "episode_traces",
                 include_node_index=True,
             )
             results["evaluation"] = {

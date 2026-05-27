@@ -10,7 +10,14 @@ from matplotlib.animation import FFMpegWriter, FuncAnimation, PillowWriter
 from scipy.ndimage import uniform_filter1d
 from tqdm import tqdm
 
-from src.common.paths import ANIMATIONS_DIR, DEFAULT_RESULTS_PATH, EPISODE_TRACES_DIR, ensure_output_dirs
+from src.common.paths import (
+    ANIMATIONS_DIR,
+    DEFAULT_RESULTS_PATH,
+    EPISODE_TRACES_DIR,
+    ensure_output_dirs,
+    resolve_episode_traces_dir,
+    resolve_results_path,
+)
 from src.core import get_topology_spec
 
 
@@ -416,8 +423,12 @@ class EpisodeTraceAnimator:
         return fig, anim
 
 
-def _find_default_trace_path() -> Path | None:
-    trace_paths = list(EPISODE_TRACES_DIR.glob("*.json"))
+def _find_default_trace_path(results_path: Path) -> Path | None:
+    trace_paths = []
+    local_trace_dir = resolve_episode_traces_dir(results_path)
+    if local_trace_dir.exists():
+        trace_paths.extend(local_trace_dir.glob("*.json"))
+    trace_paths.extend(EPISODE_TRACES_DIR.glob("*.json"))
     return max(trace_paths, key=lambda path: path.stat().st_mtime) if trace_paths else None
 
 
@@ -427,8 +438,9 @@ def create_all_animations(
     episode_trace_path: Path | None = None,
 ) -> None:
     ensure_output_dirs()
+    results_path = resolve_results_path(results_path)
     success = True
-    selected_trace_path = episode_trace_path if episode_trace_path is not None else _find_default_trace_path()
+    selected_trace_path = episode_trace_path if episode_trace_path is not None else _find_default_trace_path(results_path)
 
     print("\n" + "=" * 70)
     print("GPPO Animation Suite - Creating Visualizations")
