@@ -1,13 +1,15 @@
 # GPPO Project Architecture
 
-This document now follows the requirements in `INSTRUCTION.md`.
+This document describes the current software architecture as it exists in the repository now.
 
-It covers two views:
+It focuses on:
 
-1. the current code-mapped architecture that exists in the repository today
-2. the required revised architecture for GPPO baseline reproduction, centered on controlled topology management
-
-The key requirement from `INSTRUCTION.md` is that the environment must move from a single implicit topology to an explicit experiment structure with fixed benchmark topologies, train/test topology pools, and reset-time topology selection.
+1. CLI entrypoints and wrappers
+2. core training and evaluation flow
+3. paper-mode orchestration
+4. run-directory path resolution
+5. visualization and animation flows
+6. artifact layout
 
 ## 1. Top-Level Entry Points
 
@@ -25,64 +27,84 @@ flowchart TD
 
     MainPy -->|demo| DemoWorkflow[src/workflows/demo.py::run_demo]
     MainPy -->|train| TrainWorkflow[src/workflows/training.py::run_training_from_args]
-    MainPy -->|visualize| VizWorkflow[src/workflows/visualize.py::generate_all_visualizations]
+    MainPy -->|visualize| VisualizeWorkflow[src/workflows/visualize.py::generate_all_visualizations]
     MainPy -->|animate| AnimateWorkflow[src/visualization/animation.py::create_all_animations]
 
     RunPy -->|demo| DemoWorkflow
     RunPy -->|train| TrainParser[src/workflows/training.py::build_train_parser]
     TrainParser --> TrainWorkflow
-    RunPy -->|visualize| VizWorkflow
+    RunPy -->|visualize| VisualizeParser[src/workflows/visualize.py::build_visualize_parser]
+    VisualizeParser --> VisualizeWorkflow
     RunPy -->|animate| AnimateWorkflow
 
     TrainPy --> TrainingMain[src/workflows/training.py::main]
     TrainGppoPy --> TrainingMain
-    TrainingMain --> TrainParser
-    TrainingMain --> TrainWorkflow
-
     DemoPy --> DemoWorkflow
     VizPy --> VisualizeMain[src/workflows/visualize.py::main]
-    VisualizeMain --> VizWorkflow
+    VisualizeMain --> VisualizeWorkflow
     AnimatePy --> AnimateWorkflow
 ```
 
-## 2. Source Module Architecture
+## 2. Module Architecture
 
 ```mermaid
 flowchart LR
+    subgraph Common[src/common]
+        Paths[src/common/paths.py]
+    end
+
     subgraph Core[src/core]
         Env[src/core/environment.py\nSimplifiedORANEnv]
         GNN[src/core/gnn.py\nORANGraphBuilder\nGNNFeatureExtractor]
         Agent[src/core/agent.py\nMaskedPPOPolicy\nPPOAgent]
+        Topologies[src/core/topologies.py]
+        Pools[src/core/topology_pool.py]
+        Config[src/core/experiment_config.py]
     end
 
     subgraph Workflows[src/workflows]
         Demo[src/workflows/demo.py]
         Training[src/workflows/training.py]
+        Vectorized[src/workflows/vectorized_training.py]
+        Paper[src/workflows/paper_training.py]
+        Csv[src/workflows/training_csv.py]
+        Constants[src/workflows/training_constants.py]
         Visualize[src/workflows/visualize.py]
     end
 
     subgraph Visualization[src/visualization]
         Plots[src/visualization/plots.py]
         Animation[src/visualization/animation.py]
-        VizInit[src/visualization/__init__.py]
     end
 
-    Paths[src/common/paths.py]
-    Readme[README.md]
+    Training --> Env
+    Training --> GNN
+    Training --> Agent
+    Training --> Topologies
+    Training --> Pools
+    Training --> Config
+    Training --> Paths
+    Training --> Csv
+    Training --> Constants
+    Training --> Paper
+    Training --> Vectorized
+
+    Vectorized --> Env
+    Vectorized --> GNN
+    Vectorized --> Agent
+    Vectorized --> Paths
+
+    Paper --> Training
+    Paper --> Csv
+    Paper --> Constants
+    Paper --> Paths
 
     Demo --> Env
     Demo --> GNN
     Demo --> Agent
 
-    Training --> Env
-    Training --> GNN
-    Training --> Agent
-    Training --> Paths
-
-    Visualize --> VizInit
     Visualize --> Paths
-    VizInit --> Plots
-    VizInit --> Animation
+    Visualize --> Plots
 
     Plots --> Env
     Plots --> GNN
@@ -90,372 +112,323 @@ flowchart LR
     Plots --> Paths
 
     Animation --> Paths
-
-    Readme --> Training
-    Readme --> Visualize
 ```
 
-## 3. Current vs Required Environment Design
+## 3. Run-Directory Path Resolution
 
-```mermaid
-flowchart LR
-    subgraph Current[Current prototype]
-        C1[Topology created once in __init__]
-        C2[reset only refreshes capacities and requests]
-        C3[Single environment instance holds one graph]
-        C4[Observation length depends on edge count]
-        C5[Good for one fixed benchmark only]
-    end
+The software now treats `--results-path` as either:
 
-    subgraph Required[Required baseline reproduction design]
-        R1[Topology is explicit experiment object]
-        R2[Named benchmark topologies]
-        R3[Train topology pool and test topology pool]
-        R4[reset can select and rebuild topology]
-        R5[Stable observation shape inside each benchmark group]
-        R6[Topology metadata exposed in info]
-    end
+- a run directory such as `outputs/my_run`
+- or a concrete JSON file such as `outputs/my_run/training_results.json`
 
-    C1 --> R1
-    C2 --> R4
-    C3 --> R3
-    C4 --> R5
-    C5 --> R2
-```
-
-## 4. Current Training Pipeline
+This resolution is centralized in `src/common/paths.py`.
 
 ```mermaid
 flowchart TD
-    Start[train_gppo] --> Seed[Set numpy and torch seeds]
-    Seed --> EnsureDirs[ensure_output_dirs]
-    EnsureDirs --> EnvCtor[Construct SimplifiedORANEnv]
-    EnvCtor --> GnnCtor[Construct GNNFeatureExtractor]
-    GnnCtor --> BuilderCtor[Construct ORANGraphBuilder]
-    BuilderCtor --> AgentCtor[Construct PPOAgent]
-    AgentCtor --> EpisodeLoop{For each episode}
+    Input[User path argument]
+    Input --> ResolveResults[resolve_results_path]
+    Input --> ResolveRunDir[resolve_run_dir]
+    Input --> ResolveTraces[resolve_episode_traces_dir]
 
+    ResolveResults --> ResultsJson[training_results.json]
+    ResolveRunDir --> RunDir[run directory]
+    ResolveTraces --> TraceDir[run_dir/episode_traces]
+
+    ResolveRunDir --> ResolveCheckpoint[resolve_checkpoint_path]
+    ResolveCheckpoint --> CheckpointPt[gppo_policy.pt]
+```
+
+### Current path rules
+
+| Function | File | Purpose |
+| --- | --- | --- |
+| `resolve_results_path()` | [paths.py](/home/hpcnc/intern-research/src/common/paths.py:25) | Normalizes a run directory or JSON path into the actual results JSON path |
+| `resolve_run_dir()` | [paths.py](/home/hpcnc/intern-research/src/common/paths.py:35) | Returns the owning run directory |
+| `resolve_checkpoint_path()` | [paths.py](/home/hpcnc/intern-research/src/common/paths.py:38) | Places the checkpoint in the same run directory unless an explicit file path is given |
+| `resolve_episode_traces_dir()` | [paths.py](/home/hpcnc/intern-research/src/common/paths.py:51) | Places trace JSON files under `run_dir/episode_traces/` |
+
+## 4. Training Workflow
+
+`run_training_from_args()` is the main orchestrator for project-mode training.
+
+```mermaid
+flowchart TD
+    CLI[CLI train args] --> ResolvePaths[Resolve run paths]
+    ResolvePaths --> PaperMode{paper_mode?}
+
+    PaperMode -->|Yes| PaperRunner[src/workflows/paper_training.py::_run_paper_mode_from_args]
+    PaperMode -->|No| TrainLoop[src/workflows/training.py::train_gppo]
+
+    TrainLoop --> EnvCtor[Construct SimplifiedORANEnv]
+    TrainLoop --> GnnCtor[Construct GNNFeatureExtractor]
+    TrainLoop --> BuilderCtor[Construct ORANGraphBuilder]
+    TrainLoop --> AgentCtor[Construct PPOAgent]
+
+    AgentCtor --> EpisodeLoop{Per episode}
     EpisodeLoop --> Reset[env.reset]
-    Reset --> StepLoop{For each step}
-
-    StepLoop --> Adj[env._get_adjacency_info]
-    Adj --> BuildGraph[graph_builder.build_graph]
-    BuildGraph --> Encode[gnn graph forward pass]
-    Encode --> Mask[env.get_action_mask]
-    Mask --> Select[agent.select_action]
-    Select --> EnvStep[env.step]
-    EnvStep --> Store[agent.store_transition]
-    Store --> Metrics[Accumulate reward, cost, validity]
-    Metrics --> DoneCheck{terminated or truncated?}
-    DoneCheck -->|No| StepLoop
-    DoneCheck -->|Yes| Update[agent.update]
-    Update --> EpisodeStats[Append episode metrics]
-    EpisodeStats --> EpisodeLoop
-
-    EpisodeLoop -->|finished| WriteJson[Write outputs/training_results.json]
-    WriteJson --> SavePolicy[agent.save outputs/gppo_policy.pt]
-    SavePolicy --> Return[Return agent, gnn, results]
-```
-
-## 5. Current Training Runtime Data Flow
-
-```mermaid
-flowchart LR
-    Requests[Sampled RH demands and latencies] --> EnvState[Environment state]
-    Topology[NetworkX topology with bandwidth and delay] --> EnvState
-
-    EnvState --> Adjacency[Adjacency plus edge feature dict]
-    EnvState --> Mask[Action mask]
-
-    Adjacency --> GraphBuilder[ORANGraphBuilder.build_graph]
-    GraphBuilder --> PYGGraph[torch_geometric.data.Data]
-    PYGGraph --> GNNForward[GNNFeatureExtractor.forward]
-    GNNForward --> Embedding[128-d graph embedding]
-
-    Mask --> SelectAction[PPOAgent.select_action]
-    Embedding --> SelectAction
-    SelectAction --> Action[3N action vector\nsplit + ES + RC]
-
-    Action --> Step[env.step]
-    Step --> Reward[reward]
-    Step --> NextState[next state]
-    Step --> Info[deployment cost, penalties, validity]
-
-    Embedding --> StoreTransition[PPOAgent.store_transition]
-    Action --> StoreTransition
-    Reward --> StoreTransition
-    Mask --> StoreTransition
-    StoreTransition --> RolloutBuffer[states, actions, rewards, values,\nlog_probs, dones, action_masks]
-    RolloutBuffer --> Update[PPOAgent.update]
-```
-
-## 6. Required Paper-Aligned Topology Architecture
-
-This is the target architecture implied by `INSTRUCTION.md`. It is the design the project should follow before adding GPU-aware or mobility-aware extensions.
-
-```mermaid
-flowchart TD
-    subgraph Config[Experiment configuration]
-        Bench[Benchmark name\nsmall or large]
-        SelectMode[topology_selection_mode\nfixed or random_per_reset]
-        SeedCfg[reproducible seeds]
-    end
-
-    subgraph Registry[Topology registry layer]
-        NamedTopo[Named topology definitions\nsmall_fixed_topology\nlarge_fixed_topology]
-        TrainPool[train_topology_pool]
-        TestPool[test_topology_pool]
-    end
-
-    subgraph Env[Revised environment]
-        EnvInit[SimplifiedORANEnv init]
-        Reset[reset]
-        ChooseTopo[select or load topology]
-        BuildGraphState[rebuild topology-dependent state]
-        SampleReq[sample traffic requests]
-        GetObs[get fixed-group observation]
-        Step[step]
-        Info[info with topology_id and metadata]
-    end
-
-    Bench --> NamedTopo
-    Bench --> TrainPool
-    Bench --> TestPool
-    SelectMode --> Reset
-    SeedCfg --> Reset
-
-    NamedTopo --> EnvInit
-    TrainPool --> ChooseTopo
-    TestPool --> ChooseTopo
-
-    EnvInit --> Reset
-    Reset --> ChooseTopo
-    ChooseTopo --> BuildGraphState
-    BuildGraphState --> SampleReq
-    SampleReq --> GetObs
-    GetObs --> Step
-    Step --> Info
-```
-
-## 7. Required Reset-Time Topology Reload Flow
-
-This is the main environment change requested by `INSTRUCTION.md`.
-
-```mermaid
-sequenceDiagram
-    participant Trainer as Training loop
-    participant Env as SimplifiedORANEnv
-    participant Pool as Topology pool
-    participant Topo as Topology object
-
-    Trainer->>Env: reset(seed, mode)
-    Env->>Pool: choose topology_id
-    Pool-->>Env: topology definition
-    Env->>Topo: build or load graph
-    Topo-->>Env: topology, node_order, edge_order
-    Env->>Env: rebuild adjacency-dependent arrays
-    Env->>Env: reset ES and RC capacities
-    Env->>Env: sample slice requests
-    Env->>Env: refresh edge state
-    Env-->>Trainer: observation, info{topology_id, benchmark, metadata}
-```
-
-## 8. Required Topology-Pool Training Pipeline
-
-```mermaid
-flowchart TD
-    TrainStart[train_gppo] --> ExpCfg[Load experiment config]
-    ExpCfg --> BenchGroup[Choose benchmark group\nsmall or large]
-    BenchGroup --> EnvCtor[Construct env with topology pools]
-    EnvCtor --> EpisodeLoop{For each episode}
-
-    EpisodeLoop --> Reset[env.reset]
-    Reset --> TopoChoice[Select topology from train_topology_pool]
-    TopoChoice --> Rebuild[Rebuild topology-dependent structures]
-    Rebuild --> RequestSample[Sample requests]
-    RequestSample --> StepLoop{For each step}
-
+    Reset --> StepLoop{Per time slot}
     StepLoop --> Adj[env._get_adjacency_info]
     Adj --> BuildGraph[graph_builder.build_graph]
     BuildGraph --> Encode[gnn forward]
-    Encode --> Mask[env.get_action_mask]
-    Mask --> Select[agent.select_action]
-    Select --> EnvStep[env.step]
-    EnvStep --> Store[agent.store_transition]
-    Store --> DoneCheck{terminated or truncated}
+    Encode --> ActionMask[env.get_action_mask]
+    ActionMask --> Select[agent.select_action_sequential]
+    Select --> Step[env.step]
+    Step --> Store[agent.store_transition]
+    Store --> DoneCheck{done?}
     DoneCheck -->|No| StepLoop
     DoneCheck -->|Yes| Update[agent.update]
-    Update --> EpisodeLog[Log reward plus topology_id]
-    EpisodeLog --> EpisodeLoop
+    Update --> EpisodeMetrics[Collect reward/cost/validity/reconfig stats]
+    EpisodeMetrics --> EpisodeLoop
 
-    EpisodeLoop --> Eval[Evaluate on seen and held-out topologies]
+    EpisodeLoop --> Eval{skip_eval?}
+    Eval -->|No| TrainEval[evaluate_pool_by_topology train]
+    TrainEval --> TestEval[evaluate_pool_by_topology test]
+    Eval -->|Yes| CsvExport
+    TestEval --> CsvExport[training_csv._export_csv_artifacts]
+    CsvExport --> SaveJson[Write training_results.json]
+    SaveJson --> SavePt[Write gppo_policy.pt]
 ```
 
-## 9. Benchmark Group Constraint
+## 5. Vectorized Paper-Mode Training
 
-`INSTRUCTION.md` recommends keeping observations stable within each benchmark group instead of supporting arbitrary graph sizes immediately.
-
-```mermaid
-flowchart LR
-    SmallGroup[Small benchmark group]
-    SmallTopo1[small topology A]
-    SmallTopo2[small topology B]
-    SmallTopo3[small topology C]
-    SmallObs[Same observation contract]
-    SmallAct[Same action contract]
-
-    LargeGroup[Large benchmark group]
-    LargeTopo1[large topology A]
-    LargeTopo2[large topology B]
-    LargeObs[Same observation contract]
-    LargeAct[Same action contract]
-
-    SmallGroup --> SmallTopo1
-    SmallGroup --> SmallTopo2
-    SmallGroup --> SmallTopo3
-    SmallTopo1 --> SmallObs
-    SmallTopo2 --> SmallObs
-    SmallTopo3 --> SmallObs
-    SmallTopo1 --> SmallAct
-    SmallTopo2 --> SmallAct
-    SmallTopo3 --> SmallAct
-
-    LargeGroup --> LargeTopo1
-    LargeGroup --> LargeTopo2
-    LargeTopo1 --> LargeObs
-    LargeTopo2 --> LargeObs
-    LargeTopo1 --> LargeAct
-    LargeTopo2 --> LargeAct
-```
-
-## 10. Visualization and Animation Pipeline
+When `num_envs > 1` or `total_timesteps` is set, `train_gppo()` delegates to the synchronous vectorized path in `src/workflows/vectorized_training.py`.
 
 ```mermaid
 flowchart TD
-    Results[outputs/training_results.json]
-    Checkpoint[outputs/gppo_policy.pt]
+    TrainGPPO[train_gppo] --> Branch{num_envs > 1 or total_timesteps set?}
+    Branch -->|No| StandardLoop[Standard episode loop in training.py]
+    Branch -->|Yes| SyncVectorized[_train_gppo_sync_vectorized]
 
-    VisualizeEntrypoint[src/workflows/visualize.py::generate_all_visualizations]
-    AnimateEntrypoint[src/visualization/animation.py::create_all_animations]
-
-    VisualizeEntrypoint --> EnsureVizDirs[ensure_output_dirs]
-    AnimateEntrypoint --> EnsureAnimDirs[ensure_output_dirs]
-
-    Checkpoint --> TopologyViz[NetworkTopologyVisualizer.draw_topology]
-    Checkpoint --> InferDims[NetworkTopologyVisualizer.infer_topology_from_checkpoint]
-    InferDims --> TopologyViz
-
-    VisualizeEntrypoint --> ActionViz[ActionSpaceVisualizer.plot_action_space]
-    VisualizeEntrypoint --> CostViz[CostBreakdownVisualizer.plot_cost_components]
-    Results --> CurvesViz[TrainingVisualization.plot_training_curves]
-    Results --> StatsViz[TrainingVisualization.plot_statistics]
-    VisualizeEntrypoint --> BaselineViz[PerformanceComparison.plot_baseline_comparison]
-
-    TopologyViz --> Png1[visualizations/01_network_topology.png]
-    ActionViz --> Png2[visualizations/02_action_space.png]
-    CostViz --> Png3[visualizations/03_cost_breakdown.png]
-    CurvesViz --> Png4[visualizations/04_training_curves.png]
-    StatsViz --> Png5[visualizations/05_phase_analysis.png]
-    BaselineViz --> Png6[visualizations/06_baseline_comparison.png]
-
-    Results --> LearnAnim[TrainingAnimator.create_learning_animation]
-    Results --> RewardLandscape[TrainingAnimator.create_reward_landscape]
-    AnimateEntrypoint --> NetAnim[NetworkStateAnimator.create_network_state_animation]
-
-    LearnAnim --> Gif1[animations/01_learning_progress.gif]
-    RewardLandscape --> Img2[animations/02_reward_landscape.png]
-    NetAnim --> Gif3[animations/03_network_state.gif]
+    SyncVectorized --> EnvGroup[Build N environments]
+    EnvGroup --> ResetWorkers[Reset all workers]
+    ResetWorkers --> TimestepLoop{Until total_timesteps}
+    TimestepLoop --> ForEachEnv[Iterate each active env]
+    ForEachEnv --> GraphBuild[Build graph]
+    GraphBuild --> GnnForward[GNN forward]
+    GnnForward --> SelectAction[Masked sequential action selection]
+    SelectAction --> EnvStep[env.step]
+    EnvStep --> StoreTransition[agent.store_transition]
+    StoreTransition --> BatchReady{batch_size reached?}
+    BatchReady -->|Yes| PPOUpdate[agent.update]
+    BatchReady -->|No| ContinueLoop
+    PPOUpdate --> ContinueLoop
+    ContinueLoop --> EpisodeDone{worker episode done?}
+    EpisodeDone -->|Yes| FinalizeWorkerEpisode[append metrics and reset worker]
+    EpisodeDone -->|No| TimestepLoop
 ```
 
-## 11. Key Function Call Map
+## 6. Paper-Mode Orchestration
 
-| File | Function / Class | Calls / Uses | Output |
-|---|---|---|---|
-| `main.py` | `main()` | `run_demo()`, `run_training_from_args()`, `generate_all_visualizations()`, `create_all_animations()` | Dispatches subcommands |
-| `run.py` | `main()` | `build_train_parser()`, same workflow functions as `main.py` | Convenience task router |
-| `src/workflows/training.py` | `train_gppo()` | `SimplifiedORANEnv`, `GNNFeatureExtractor`, `ORANGraphBuilder`, `PPOAgent` | Trained agent, GNN, metrics dict, checkpoint, JSON results |
-| `src/workflows/training.py` | `evaluate_gppo()` | `env.reset()`, `build_graph()`, `gnn()`, `agent.select_action()`, `env.step()` | Printed evaluation metrics |
-| `src/workflows/training.py` | `run_training_from_args()` | `train_gppo()`, optionally `evaluate_gppo()` | Full train workflow from CLI args |
-| `src/workflows/demo.py` | `run_demo()` | `demo_environment()`, `demo_gnn()`, `demo_ppo_agent()`, `demo_integration()` | Printed sanity-check demo output |
-| `src/workflows/visualize.py` | `generate_all_visualizations()` | Visualization classes from `src.visualization` and `ensure_output_dirs()` | PNG charts in `visualizations/` |
-| `src/core/environment.py` | `reset()` | `_sample_requests()`, `_refresh_edge_state()`, `_get_state()` | Current behavior: initial observation and empty info dict |
-| `src/core/environment.py` | `get_action_mask()` | topology queries | Boolean masks for split, ES, and RC actions |
-| `src/core/environment.py` | `step()` | `_evaluate_action()`, `_refresh_edge_state()`, `_sample_requests()`, `_get_state()` | Next state, reward, terminated, truncated, info |
-| `src/core/environment.py` | `_get_adjacency_info()` | topology edge scan | Adjacency matrix, edge feature dict, node order |
-| `src/core/gnn.py` | `ORANGraphBuilder.build_graph()` | current environment arrays plus adjacency/edge features | `torch_geometric.data.Data` graph |
-| `src/core/gnn.py` | `GNNFeatureExtractor.forward()` | `GINEConv`, `global_mean_pool` | Graph embedding tensor |
-| `src/core/agent.py` | `PPOAgent.select_action()` | `MaskedPPOPolicy.get_distributions()` | Action vector, log-prob, value |
-| `src/core/agent.py` | `PPOAgent.store_transition()` | rollout buffer append | In-memory trajectory data |
-| `src/core/agent.py` | `PPOAgent.compute_advantages()` | stored rewards, values, dones | GAE advantages and returns |
-| `src/core/agent.py` | `PPOAgent.update()` | `compute_advantages()`, `policy.get_distributions()`, optimizer step | Updated policy parameters |
-| `src/visualization/animation.py` | `create_all_animations()` | `TrainingAnimator`, `NetworkStateAnimator`, `ensure_output_dirs()` | GIF and PNG animation assets |
-| `src/common/paths.py` | `ensure_output_dirs()` | `Path.mkdir()` | Creates `outputs/`, `visualizations/`, `animations/` |
+Paper mode is a higher-level wrapper around training and evaluation.
 
-## 12. Required Environment Refactor Map
+```mermaid
+flowchart TD
+    PaperCLI[--paper-mode] --> Resolve[resolve_results_path + resolve_checkpoint_path]
+    Resolve --> BenchmarkMap[_paper_benchmark_name]
+    BenchmarkMap --> SeedLoop{for each seed}
 
-This section translates `INSTRUCTION.md` into concrete code responsibilities.
+    SeedLoop --> SeedTrain[train_gppo with paper params]
+    SeedTrain --> SeedEvalTrain[evaluate_pool_by_topology train]
+    SeedEvalTrain --> SeedEvalTest[evaluate_pool_by_topology test]
+    SeedEvalTest --> SeedCsv[_export_csv_artifacts]
+    SeedCsv --> SeedJson[write seed JSON]
+    SeedJson --> SeedLoop
 
-| Required capability | Current status | Needed code change |
-|---|---|---|
-| Fixed named topologies | Missing | Add named topology definitions instead of one internal random generator |
-| Train/test topology pools | Missing | Add topology pool objects or config lists with topology IDs |
-| Reset-time topology selection | Missing | Move topology selection and rebuild logic into `reset()` |
-| Reproducible benchmark configs | Partial | Add experiment-level config for benchmark, seed, topology mode |
-| Stable observation inside benchmark group | Partial | Keep edge and node layout fixed within a benchmark pool |
-| Topology metadata in `info` | Missing | Return `topology_id`, benchmark name, and topology metadata |
-| Cross-topology evaluation | Missing | Separate seen-topology and held-out-topology evaluation paths |
+    SeedLoop --> Aggregate[_seed_summary_rows]
+    Aggregate --> AggregateJson[write aggregate JSON]
+    AggregateJson --> ReportJson[write paper_alignment_report.json]
+    ReportJson --> ReportMd[write Reports.md]
+```
 
-## 13. Compatibility Layer
+## 7. Environment and Decision Pipeline
 
-These files are wrappers or re-exports, not the main implementation:
+The environment executes one paper-style time slot per `step()`.
 
 ```mermaid
 flowchart LR
-    TrainShim[train.py] --> TrainImpl[src/workflows/training.py]
-    TrainCompat[train_gppo.py] --> TrainImpl
-    DemoShim[demo.py] --> DemoImpl[src/workflows/demo.py]
-    VizShim[visualize_results.py] --> VizImpl[src/workflows/visualize.py]
-    AnimShim[animate_training.py] --> AnimImpl[src/visualization/animation.py]
+    Requests[RH demands and latency budgets]
+    Topology[Topology graph]
+    PrevAction[Previous action]
 
-    PPOShim[ppo_agent.py] --> PPOImpl[src/core/agent.py]
-    EnvShim[oran_environment.py] --> EnvImpl[src/core/environment.py]
-    GNNShim[gnn_feature_extractor.py] --> GNNImpl[src/core/gnn.py]
-    VizExports[visualization.py] --> PlotImpl[src/visualization/plots.py]
+    Requests --> State[Environment state]
+    Topology --> State
+    PrevAction --> Eval
+
+    State --> Mask[get_action_mask]
+    State --> Adj[_get_adjacency_info]
+    Adj --> GraphBuilder[ORANGraphBuilder.build_graph]
+    GraphBuilder --> PYGGraph[PyG graph]
+    PYGGraph --> GNNForward[GNNFeatureExtractor.forward]
+    GNNForward --> Features[Graph embedding]
+    Mask --> Policy[PPOAgent.select_action_sequential]
+    Features --> Policy
+    Policy --> Action[flat action vector]
+
+    Action --> Decode[_split_action]
+    Decode --> Eval[_evaluate_action]
+    Eval --> Reward[step reward]
+    Eval --> Info[per-slot metrics and reasons]
+    Eval --> NextResources[ES/RC remaining + edge remaining]
 ```
 
-## 14. Proposed File-Level Revision Plan
+### Core environment methods
 
-This is the cleanest file-level architecture that follows the instruction while preserving the current baseline action and reward logic.
+| File | Method | Role |
+| --- | --- | --- |
+| [environment.py](/home/hpcnc/intern-research/src/core/environment.py:173) | `reset()` | Select topology, sample requests, report feasibility diagnostics |
+| [environment.py](/home/hpcnc/intern-research/src/core/environment.py:234) | `_split_action()` | Decode flat action into split / ES / RC vectors |
+| [environment.py](/home/hpcnc/intern-research/src/core/environment.py:249) | `get_action_mask()` | Structural action masking |
+| [environment.py](/home/hpcnc/intern-research/src/core/environment.py:273) | `get_conditional_rc_mask()` | RC mask conditioned on split and ES |
+| [environment.py](/home/hpcnc/intern-research/src/core/environment.py:551) | `_evaluate_action()` | Compute validity, costs, penalties, invalid reasons |
+| [environment.py](/home/hpcnc/intern-research/src/core/environment.py:710) | `step()` | Convert action metrics into reward, termination, next state, and `info` |
+
+## 8. Evaluation and Trace Export
+
+Evaluation runs the policy deterministically and records traces plus aggregated summaries.
+
+```mermaid
+flowchart TD
+    EvaluatePool[evaluate_pool_by_topology] --> ForEachTopology{topology in pool}
+    ForEachTopology --> EvaluateGPPO[evaluate_gppo]
+
+    EvaluateGPPO --> Reset[env.reset]
+    Reset --> SlotLoop{per slot}
+    SlotLoop --> GraphBuild[build graph]
+    GraphBuild --> PolicyStep[deterministic policy action]
+    PolicyStep --> EnvStep[env.step]
+    EnvStep --> TraceRow[append slot trace]
+    TraceRow --> SlotLoop
+
+    SlotLoop --> EpisodeTraceJson[_write_episode_trace]
+    EpisodeTraceJson --> EpisodeTraceCsv[_write_episode_trace_csv]
+    EpisodeTraceCsv --> TopologySummary[aggregate per-topology metrics]
+    TopologySummary --> PoolSummary[return pool summary]
+```
+
+### Trace and CSV responsibilities
+
+| File | Function | Output |
+| --- | --- | --- |
+| [training.py](/home/hpcnc/intern-research/src/workflows/training.py:79) | `_write_episode_trace()` | Per-episode trace JSON |
+| [training_csv.py](/home/hpcnc/intern-research/src/workflows/training_csv.py:66) | `_write_episode_trace_csv()` | Per-episode trace CSV |
+| [training_csv.py](/home/hpcnc/intern-research/src/workflows/training_csv.py:238) | `_export_csv_artifacts()` | Run-level CSV summaries |
+
+## 9. Visualization Architecture
+
+The visualization workflow is now compact by default.
+
+```mermaid
+flowchart TD
+    VisualizeEntry[generate_all_visualizations] --> Resolve[resolve_results_path + resolve_checkpoint_path]
+    Resolve --> Mode{mode}
+
+    Mode -->|compact| Compact[compact default set]
+    Mode -->|full| Full[full visualization suite]
+    Mode -->|topology| TopologyOnly[topology snapshots only]
+    Mode -->|csv| CsvOnly[CSV-backed plots only]
+
+    Compact --> PlotTrain[training_curves.png]
+    Compact --> PlotEval[evaluation_topology_summary.png]
+    Compact --> PlotSplit[split_usage.png]
+    Compact --> PlotCost[cost_breakdown.png]
+    Compact --> PlotTrace[episode_trace.png if available]
+
+    Full --> LegacyPlots[extra diagnostics and topology plots]
+    TopologyOnly --> TopologyPlots[per-topology snapshot PNGs]
+    CsvOnly --> CsvPlots[CSV-first compact charts]
+```
+
+### Default compact output set
+
+| Output | Source |
+| --- | --- |
+| `training_curves.png` | CSV-backed if available, otherwise JSON-backed |
+| `evaluation_topology_summary.png` | CSV-backed if available, otherwise JSON-backed |
+| `split_usage.png` | JSON-backed split-usage visualization |
+| `cost_breakdown.png` | CSV-backed if available, otherwise JSON-backed |
+| `episode_trace.png` | First available episode trace CSV |
+
+### Key visualization methods
+
+| File | Method | Purpose |
+| --- | --- | --- |
+| [visualize.py](/home/hpcnc/intern-research/src/workflows/visualize.py:99) | `generate_all_visualizations()` | Main visualization orchestrator |
+| [plots.py](/home/hpcnc/intern-research/src/visualization/plots.py:363) | `plot_training_curves()` | JSON-backed training overview |
+| [plots.py](/home/hpcnc/intern-research/src/visualization/plots.py:643) | `plot_training_metrics_from_csv()` | CSV-backed training overview |
+| [plots.py](/home/hpcnc/intern-research/src/visualization/plots.py:586) | `plot_evaluation_topology_summary()` | JSON-backed evaluation summary |
+| [plots.py](/home/hpcnc/intern-research/src/visualization/plots.py:731) | `plot_evaluation_topology_summary_from_csv()` | CSV-backed evaluation summary |
+| [plots.py](/home/hpcnc/intern-research/src/visualization/plots.py:416) | `plot_split_usage()` | Policy interpretation via split usage |
+| [plots.py](/home/hpcnc/intern-research/src/visualization/plots.py:679) | `plot_cost_components_from_csv()` | Cost trend summary |
+| [plots.py](/home/hpcnc/intern-research/src/visualization/plots.py:856) | `plot_episode_trace_from_csv()` | Time-slot behavior plot |
+| [plots.py](/home/hpcnc/intern-research/src/visualization/plots.py:259) | `NetworkTopologyVisualizer.draw_topology()` | Topology snapshot with optional checkpoint inference |
+
+## 10. Animation Architecture
+
+```mermaid
+flowchart TD
+    AnimateEntry[create_all_animations] --> ResolveResults[resolve_results_path]
+    ResolveResults --> FindTrace[_find_default_trace_path]
+
+    ResolveResults --> Learning[TrainingAnimator.create_learning_animation]
+    ResolveResults --> RewardLandscape[TrainingAnimator.create_reward_landscape]
+    FindTrace --> EpisodeAnim[EpisodeTraceAnimator.create_episode_animation]
+    AnimateEntry --> NetworkAnim[NetworkStateAnimator.create_network_state_animation]
+
+    Learning --> A1[animations/01_learning_progress.mp4]
+    RewardLandscape --> A2[animations/02_reward_landscape.png]
+    EpisodeAnim --> A3[animations/03_episode_evolution.mp4]
+    NetworkAnim --> A4[animations/04_network_state.mp4]
+```
+
+The animation entrypoint now prefers trace JSON files under the same run directory as `--results-path`, then falls back to the global `outputs/episode_traces/` directory.
+
+## 11. Artifact Layout
+
+Current run-directory layout:
 
 ```mermaid
 flowchart LR
-    New1[src/core/topologies.py\nNamed topology definitions]
-    New2[src/core/topology_pool.py\nTrain and test pool logic]
-    New3[src/core/experiment_config.py\nBenchmark and selection config]
-
-    Env[src/core/environment.py]
-    Train[src/workflows/training.py]
-    Viz[src/workflows/visualize.py]
-
-    New1 --> New2
-    New3 --> New2
-    New2 --> Env
-    New3 --> Train
-    Env --> Train
-    Train --> Viz
+    RunDir[outputs/my_run]
+    RunDir --> Results[training_results.json]
+    RunDir --> Checkpoint[gppo_policy.pt]
+    RunDir --> Csv1[training_episode_metrics.csv]
+    RunDir --> Csv2[evaluation_topology_summary.csv]
+    RunDir --> Csv3[invalid_reason_summary.csv]
+    RunDir --> Csv4[timing_profile.csv]
+    RunDir --> TraceCsvs[*_episode_*.csv]
+    RunDir --> TraceDir[episode_traces/]
+    TraceDir --> TraceJsons[*_episode_*.json]
 ```
 
-## 15. Artifact Summary
+Paper mode adds a nested seed directory structure:
 
 ```mermaid
 flowchart LR
-    Train[Training workflow] --> ResultsJson[outputs/training_results.json]
-    Train --> PolicyPt[outputs/gppo_policy.pt]
+    BaseRun[outputs/my_paper_run]
+    BaseRun --> AggregateJson[training_results.json]
+    BaseRun --> AggregateReport[paper_alignment_report.json]
+    BaseRun --> PaperRuns[paper_runs/]
 
-    ResultsJson --> VisualCharts[Training plots]
-    ResultsJson --> AnimAssets[Learning animation and reward landscape]
-    PolicyPt --> TopologyInference[Topology inference for visualization]
-
-    VisualCharts --> VizDir[visualizations/*.png]
-    AnimAssets --> AnimDir[animations/*]
+    PaperRuns --> SeedJsons[*_seed_*.json]
+    PaperRuns --> SeedPts[*_seed_*.pt]
+    PaperRuns --> SeedCsvs[run-level CSV summaries]
+    PaperRuns --> SeedTraceCsvs[*_episode_*.csv]
+    PaperRuns --> SeedTraceDir[episode_traces/]
 ```
+
+## 12. Current Key Function Map
+
+| File | Function / Class | Calls / Uses | Main output |
+| --- | --- | --- | --- |
+| `run.py` | `main()` | training, visualize, animate workflows | Convenience task router |
+| `main.py` | `main()` | same workflows via subcommands | Alternative CLI entrypoint |
+| `src/workflows/training.py` | `run_training_from_args()` | path resolution, `train_gppo()`, evaluation, CSV export | Full train/eval workflow |
+| `src/workflows/training.py` | `train_gppo()` | env, GNN, graph builder, PPO agent | Standard training path |
+| `src/workflows/vectorized_training.py` | `_train_gppo_sync_vectorized()` | multi-env synchronous rollout | Paper/vectorized training path |
+| `src/workflows/paper_training.py` | `_run_paper_mode_from_args()` | multi-seed orchestration | Aggregate paper-mode run |
+| `src/workflows/training.py` | `evaluate_gppo()` | deterministic policy rollout, trace export | Per-topology evaluation summary |
+| `src/workflows/training.py` | `evaluate_pool_by_topology()` | repeated `evaluate_gppo()` | Pool-wide evaluation summary |
+| `src/workflows/visualize.py` | `generate_all_visualizations()` | mode-based plot orchestration | Compact/full visualization output |
+| `src/visualization/animation.py` | `create_all_animations()` | learning animation, reward landscape, episode animation, network animation | MP4/PNG animation assets |
+| `src/common/paths.py` | path resolvers | run-dir normalization | Consistent artifact placement |
+

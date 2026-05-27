@@ -73,6 +73,8 @@ Generate plots:
 
 ```bash
 python run.py visualize
+python run.py visualize --results-path outputs/my_run
+python run.py visualize --full-visualization --results-path outputs/my_run
 ```
 
 Generate animations:
@@ -106,7 +108,7 @@ Available tasks:
 - `visualize`
 - `animate`
 
-`run.py` only owns a small set of wrapper flags. The full training flags are handled by `src/workflows/training.py`.
+`run.py` owns a small set of wrapper flags and forwards workflow-specific flags to training and visualization.
 
 ## `run.py` Flags
 
@@ -119,16 +121,17 @@ python run.py <task> [--results-path PATH] [--gif-workers N] [--episode-trace-pa
 Flags:
 
 - `task`: selects the workflow. Valid values are `demo`, `train`, `visualize`, and `animate`.
-- `--results-path PATH`: top-level results file path. For `train`, it is forwarded into the training parser. For `animate`, it selects which training results JSON to animate. It is not currently forwarded by `run.py visualize`.
+- `--results-path PATH`: shared run path. It can be a run directory such as `outputs/my_run` or a concrete results JSON path. It is forwarded into `train` and `visualize`, and used by `animate` to find the run artifacts.
 - `--gif-workers N`: number of worker threads used during learning-animation frame rendering in the animate workflow. The output is now MP4, but the flag name is still `gif-workers`.
 - `--episode-trace-path PATH`: explicit evaluated episode trace JSON for the episode animation.
 
 Examples:
 
 ```bash
-python run.py train --results-path outputs/my_run.json --episodes 50 --benchmark small
-python run.py animate --results-path outputs/my_run.json
-python run.py animate --episode-trace-path outputs/episode_traces/train_small_balanced_train_a_legacy_episode_000.json
+python run.py train --results-path outputs/my_run --episodes 50 --benchmark small
+python run.py visualize --results-path outputs/my_run
+python run.py animate --results-path outputs/my_run
+python run.py animate --episode-trace-path outputs/my_run/episode_traces/train_small_balanced_train_a_legacy_episode_000.json
 ```
 
 ## Training Flags
@@ -184,9 +187,9 @@ Important behavior:
 ### Output and Evaluation Flags
 
 - `--results-path PATH`
-  Output JSON path for run metrics. Default: `outputs/training_results.json`.
+  Run directory or output JSON path. If you pass a directory such as `outputs/my_run`, training writes `training_results.json`, `gppo_policy.pt`, CSVs, and trace files inside that directory. Default: `outputs/`.
 - `--checkpoint-path PATH`
-  Output checkpoint path. Default: `outputs/gppo_policy.pt`.
+  Checkpoint file path or directory. If omitted, the checkpoint is placed in the same run directory as `--results-path`.
 - `--skip-eval`
   Skips post-training evaluation on the train/test topology pools.
 - `--eval-episodes INT`
@@ -229,6 +232,18 @@ Paper-mode aggregate run:
 python run.py train --paper-mode --benchmark large --device cuda --paper-num-seeds 6 --paper-num-envs 32
 ```
 
+## Visualization Feature
+
+The default visualization flow is intentionally compact. It generates only the highest-value charts for quick model inspection:
+
+- `training_curves.png`
+- `evaluation_topology_summary.png`
+- `split_usage.png`
+- `cost_breakdown.png`
+- `episode_trace.png` if a trace CSV is available
+
+The default flow does not generate the older full chart dump. Lower-value or more specialized plots are now behind optional flags.
+
 ## Visualization Flags
 
 Direct workflow command:
@@ -240,20 +255,32 @@ python -m src.workflows.visualize [flags]
 Supported flags:
 
 - `--results-path PATH`
-  Training results JSON to visualize. Default: `outputs/training_results.json`.
+  Run directory or training results JSON path. If you pass a run directory such as `outputs/my_run`, visualization loads `training_results.json`, CSV artifacts, checkpoint metadata, and local trace files from that run. Default: `outputs/`.
 - `--checkpoint-path PATH`
-  Policy checkpoint used for topology-aware visualizations. Default: `outputs/gppo_policy.pt`.
+  Policy checkpoint file path or directory. If omitted, visualization resolves `gppo_policy.pt` from the same run directory as `--results-path`.
+- `--compact`
+  Generate the compact default visualization set. This is the intended normal mode.
+- `--full-visualization`
+  Generate the larger legacy-style visualization suite, including extra and diagnostic plots.
+- `--topology-only`
+  Generate topology snapshot figures only.
+- `--csv-only`
+  Generate only the CSV-backed chart set.
 
 Example:
 
 ```bash
-python -m src.workflows.visualize --results-path outputs/my_run.json --checkpoint-path outputs/my_policy.pt
+python run.py visualize --results-path outputs/my_run
+python run.py visualize --full-visualization --results-path outputs/my_run
+python run.py visualize --topology-only --results-path outputs/my_run
+python -m src.workflows.visualize --csv-only --results-path outputs/my_run
 ```
 
 Note:
 
-- `python run.py visualize` uses default paths only.
-- If you need custom paths, use `python -m src.workflows.visualize ...`.
+- `python run.py visualize` now forwards visualize flags correctly.
+- The compact mode falls back sensibly between CSV-backed and JSON-backed plots depending on which artifacts exist in the run directory.
+- Topology snapshots are no longer part of the default visualization run; use `--topology-only` or `--full-visualization` if you want them.
 
 ## Animation Flags
 
@@ -266,7 +293,7 @@ python run.py animate [flags]
 Supported flags:
 
 - `--results-path PATH`
-  Training results JSON used for learning-progress and reward-landscape animations. Default fallback: `outputs/training_results.json`.
+  Run directory or training results JSON path. If you pass a run directory, animation resolves `training_results.json` from that directory and also looks for trace JSON files under that run's `episode_traces/` folder.
 - `--gif-workers INT`
   Worker threads for learning-animation frame rendering. The flag name is historical; the rendered animation is MP4.
 - `--episode-trace-path PATH`
@@ -297,14 +324,22 @@ New code should prefer `run.py` or `src.workflows.*`.
 
 Default output files:
 
-- `outputs/training_results.json`
-- `outputs/gppo_policy.pt`
-- `outputs/training_episode_metrics.csv`
-- `outputs/evaluation_topology_summary.csv`
-- `outputs/invalid_reason_summary.csv`
-- `outputs/timing_profile.csv`
-- `outputs/episode_traces/*.json`
-- `outputs/episode_traces/*.csv`
+- `outputs/<run_name>/training_results.json`
+- `outputs/<run_name>/gppo_policy.pt`
+- `outputs/<run_name>/training_episode_metrics.csv`
+- `outputs/<run_name>/evaluation_topology_summary.csv`
+- `outputs/<run_name>/invalid_reason_summary.csv`
+- `outputs/<run_name>/timing_profile.csv`
+- `outputs/<run_name>/episode_traces/*.json`
+- `outputs/<run_name>/*_episode_*.csv`
+
+Example:
+
+```bash
+python run.py train --results-path outputs/my_run ...
+python run.py visualize --results-path outputs/my_run
+python run.py animate --results-path outputs/my_run
+```
 
 `training_results.json` includes:
 
