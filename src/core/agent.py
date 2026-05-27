@@ -35,6 +35,14 @@ class MaskedPPOPolicy(nn.Module):
         self.es_head = nn.Linear(hidden_dim, num_rhs * num_ess)
         self.rc_head = nn.Linear(hidden_dim, num_rhs * num_rcs)
         self.value_net = nn.Linear(hidden_dim, 1)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.xavier_uniform_(module.weight)
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
 
     def forward(self, features: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         hidden = self.backbone(features)

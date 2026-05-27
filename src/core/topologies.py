@@ -65,6 +65,21 @@ class FamilyProfile:
     description: str
 
 
+@dataclass(frozen=True)
+class LinkSamplingOverride:
+    rh_primary_bw: Tuple[float, float]
+    rh_secondary_bw: Tuple[float, float]
+    es_rc_primary_bw: Tuple[float, float]
+    es_rc_secondary_bw: Tuple[float, float]
+    rh_primary_delay: Tuple[float, float]
+    rh_secondary_delay: Tuple[float, float]
+    es_rc_primary_delay: Tuple[float, float]
+    es_rc_secondary_delay: Tuple[float, float]
+    direct_rc_delay: Tuple[float, float]
+    direct_rc_bw: float
+    direct_rc_probability: float | None = None
+
+
 def _edge(source: str, target: str, delay: float, bandwidth: float) -> EdgeSpec:
     return EdgeSpec(source=source, target=target, delay=round(float(delay), 4), bandwidth=round(float(bandwidth), 4))
 
@@ -149,6 +164,21 @@ FAMILY_PROFILES: Dict[str, FamilyProfile] = {
 }
 
 
+PAPER_SECTION_VI_LINKS = LinkSamplingOverride(
+    rh_primary_bw=(10.0, 40.0),
+    rh_secondary_bw=(10.0, 40.0),
+    es_rc_primary_bw=(10.0, 40.0),
+    es_rc_secondary_bw=(10.0, 40.0),
+    rh_primary_delay=(0.0, 3.6),
+    rh_secondary_delay=(0.0, 3.6),
+    es_rc_primary_delay=(0.0, 3.6),
+    es_rc_secondary_delay=(0.0, 3.6),
+    direct_rc_delay=(0.1, 0.25),
+    direct_rc_bw=160.0,
+    direct_rc_probability=0.10,
+)
+
+
 def _generate_topology_spec(
     *,
     topology_id: str,
@@ -158,18 +188,39 @@ def _generate_topology_spec(
     num_rcs: int,
     seed: int,
     family: str,
+    link_override: LinkSamplingOverride | None = None,
 ) -> TopologySpec:
     profile = FAMILY_PROFILES[family]
+    links = link_override or LinkSamplingOverride(
+        rh_primary_bw=profile.rh_primary_bw,
+        rh_secondary_bw=profile.rh_secondary_bw,
+        es_rc_primary_bw=profile.es_rc_primary_bw,
+        es_rc_secondary_bw=profile.es_rc_secondary_bw,
+        rh_primary_delay=profile.rh_primary_delay,
+        rh_secondary_delay=profile.rh_secondary_delay,
+        es_rc_primary_delay=profile.es_rc_primary_delay,
+        es_rc_secondary_delay=profile.es_rc_secondary_delay,
+        direct_rc_delay=profile.direct_rc_delay,
+        direct_rc_bw=profile.direct_rc_bw,
+        direct_rc_probability=None,
+    )
     rng = np.random.default_rng(seed)
     edges: List[EdgeSpec] = []
 
-    num_direct_links = max(1, num_rhs // 4)
     direct_link_rhs: List[int] = []
-    cursor = (seed + profile.direct_rc_offset) % num_rhs
-    while len(direct_link_rhs) < num_direct_links:
-        if cursor not in direct_link_rhs:
-            direct_link_rhs.append(cursor)
-        cursor = (cursor + profile.direct_rc_stride) % num_rhs
+    if links.direct_rc_probability is None:
+        num_direct_links = max(1, num_rhs // 4)
+        cursor = (seed + profile.direct_rc_offset) % num_rhs
+        while len(direct_link_rhs) < num_direct_links:
+            if cursor not in direct_link_rhs:
+                direct_link_rhs.append(cursor)
+            cursor = (cursor + profile.direct_rc_stride) % num_rhs
+    else:
+        direct_link_rhs = [
+            rh_idx
+            for rh_idx in range(num_rhs)
+            if rng.random() < float(links.direct_rc_probability)
+        ]
 
     for rh_idx in range(num_rhs):
         base_es = rh_idx % num_ess
@@ -182,16 +233,16 @@ def _generate_topology_spec(
             _edge(
                 f"RH{rh_idx}",
                 f"ES{primary_es}",
-                delay=rng.uniform(*profile.rh_primary_delay),
-                bandwidth=rng.uniform(*profile.rh_primary_bw),
+                delay=rng.uniform(*links.rh_primary_delay),
+                bandwidth=rng.uniform(*links.rh_primary_bw),
             )
         )
         edges.append(
             _edge(
                 f"RH{rh_idx}",
                 f"ES{secondary_es}",
-                delay=rng.uniform(*profile.rh_secondary_delay),
-                bandwidth=rng.uniform(*profile.rh_secondary_bw),
+                delay=rng.uniform(*links.rh_secondary_delay),
+                bandwidth=rng.uniform(*links.rh_secondary_bw),
             )
         )
 
@@ -201,8 +252,8 @@ def _generate_topology_spec(
                 _edge(
                     f"RH{rh_idx}",
                     f"RC{direct_rc}",
-                    delay=rng.uniform(*profile.direct_rc_delay),
-                    bandwidth=profile.direct_rc_bw,
+                    delay=rng.uniform(*links.direct_rc_delay),
+                    bandwidth=links.direct_rc_bw,
                 )
             )
 
@@ -217,16 +268,16 @@ def _generate_topology_spec(
             _edge(
                 f"ES{es_idx}",
                 f"RC{primary_rc}",
-                delay=rng.uniform(*profile.es_rc_primary_delay),
-                bandwidth=rng.uniform(*profile.es_rc_primary_bw),
+                delay=rng.uniform(*links.es_rc_primary_delay),
+                bandwidth=rng.uniform(*links.es_rc_primary_bw),
             )
         )
         edges.append(
             _edge(
                 f"ES{es_idx}",
                 f"RC{secondary_rc}",
-                delay=rng.uniform(*profile.es_rc_secondary_delay),
-                bandwidth=rng.uniform(*profile.es_rc_secondary_bw),
+                delay=rng.uniform(*links.es_rc_secondary_delay),
+                bandwidth=rng.uniform(*links.es_rc_secondary_bw),
             )
         )
 
@@ -236,7 +287,10 @@ def _generate_topology_spec(
         "family": profile.family,
         "difficulty": profile.difficulty,
         "description": profile.description,
-        "benchmark_label": f"project_{benchmark}",
+        "benchmark_label": benchmark if benchmark.startswith("paper_") else f"project_{benchmark}",
+        "paper_aligned": bool(benchmark.startswith("paper_")),
+        "paper_aligned_large": bool(benchmark == "paper_large"),
+        "direct_rc_probability": links.direct_rc_probability,
     }
     return TopologySpec(
         topology_id=topology_id,
@@ -288,6 +342,56 @@ def build_default_topology_registry() -> Dict[str, TopologySpec]:
             family="direct_heavy",
         ),
         _generate_topology_spec(
+            topology_id="paper_small_topology_a",
+            benchmark="paper_small",
+            num_rhs=8,
+            num_ess=3,
+            num_rcs=2,
+            seed=131,
+            family="balanced",
+            link_override=PAPER_SECTION_VI_LINKS,
+        ),
+        _generate_topology_spec(
+            topology_id="paper_small_topology_b",
+            benchmark="paper_small",
+            num_rhs=8,
+            num_ess=3,
+            num_rcs=2,
+            seed=232,
+            family="clustered",
+            link_override=PAPER_SECTION_VI_LINKS,
+        ),
+        _generate_topology_spec(
+            topology_id="paper_small_topology_c",
+            benchmark="paper_small",
+            num_rhs=8,
+            num_ess=3,
+            num_rcs=2,
+            seed=333,
+            family="sparse_backhaul",
+            link_override=PAPER_SECTION_VI_LINKS,
+        ),
+        _generate_topology_spec(
+            topology_id="paper_small_topology_d",
+            benchmark="paper_small",
+            num_rhs=8,
+            num_ess=3,
+            num_rcs=2,
+            seed=434,
+            family="direct_heavy",
+            link_override=PAPER_SECTION_VI_LINKS,
+        ),
+        _generate_topology_spec(
+            topology_id="paper_small_topology_e",
+            benchmark="paper_small",
+            num_rhs=8,
+            num_ess=3,
+            num_rcs=2,
+            seed=535,
+            family="balanced",
+            link_override=PAPER_SECTION_VI_LINKS,
+        ),
+        _generate_topology_spec(
             topology_id="large_balanced_train_a",
             benchmark="large",
             num_rhs=16,
@@ -323,6 +427,46 @@ def build_default_topology_registry() -> Dict[str, TopologySpec]:
             seed=808,
             family="direct_heavy",
         ),
+        _generate_topology_spec(
+            topology_id="paper_large_balanced_train_a",
+            benchmark="paper_large",
+            num_rhs=64,
+            num_ess=4,
+            num_rcs=2,
+            seed=909,
+            family="balanced",
+            link_override=PAPER_SECTION_VI_LINKS,
+        ),
+        _generate_topology_spec(
+            topology_id="paper_large_clustered_train_b",
+            benchmark="paper_large",
+            num_rhs=64,
+            num_ess=4,
+            num_rcs=2,
+            seed=1001,
+            family="clustered",
+            link_override=PAPER_SECTION_VI_LINKS,
+        ),
+        _generate_topology_spec(
+            topology_id="paper_large_sparse_test_a",
+            benchmark="paper_large",
+            num_rhs=64,
+            num_ess=4,
+            num_rcs=2,
+            seed=1102,
+            family="sparse_backhaul",
+            link_override=PAPER_SECTION_VI_LINKS,
+        ),
+        _generate_topology_spec(
+            topology_id="paper_large_direct_test_b",
+            benchmark="paper_large",
+            num_rhs=64,
+            num_ess=4,
+            num_rcs=2,
+            seed=1203,
+            family="direct_heavy",
+            link_override=PAPER_SECTION_VI_LINKS,
+        ),
     ]
     return {spec.topology_id: spec for spec in specs}
 
@@ -335,9 +479,29 @@ DEFAULT_BENCHMARK_TOPOLOGY_POOLS: Dict[str, Dict[str, Tuple[str, ...]]] = {
         "train": ("small_balanced_train_a", "small_clustered_train_b"),
         "test": ("small_sparse_test_a", "small_direct_test_b"),
     },
+    "paper_small": {
+        "train": (
+            "paper_small_topology_a",
+            "paper_small_topology_b",
+            "paper_small_topology_c",
+            "paper_small_topology_d",
+            "paper_small_topology_e",
+        ),
+        "test": (
+            "paper_small_topology_a",
+            "paper_small_topology_b",
+            "paper_small_topology_c",
+            "paper_small_topology_d",
+            "paper_small_topology_e",
+        ),
+    },
     "large": {
         "train": ("large_balanced_train_a", "large_clustered_train_b"),
         "test": ("large_sparse_test_a", "large_direct_test_b"),
+    },
+    "paper_large": {
+        "train": ("paper_large_balanced_train_a", "paper_large_clustered_train_b"),
+        "test": ("paper_large_sparse_test_a", "paper_large_direct_test_b"),
     },
 }
 

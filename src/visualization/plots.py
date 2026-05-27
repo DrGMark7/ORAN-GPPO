@@ -1,5 +1,6 @@
 """Visualization tools for GPPO framework."""
 
+import csv
 import json
 import os
 from pathlib import Path
@@ -12,8 +13,50 @@ import numpy as np
 import torch
 from scipy.ndimage import uniform_filter1d
 
-from src.common.paths import DEFAULT_CHECKPOINT_PATH
+from src.common.paths import DEFAULT_CHECKPOINT_PATH, EPISODE_TRACES_DIR, OUTPUTS_DIR
 from src.core import GNNFeatureExtractor, ORANGraphBuilder, PPOAgent, SimplifiedORANEnv, get_topology_spec
+
+
+def _load_csv_rows(csv_path: str | Path) -> List[Dict[str, str]]:
+    path = Path(csv_path)
+    if not path.exists():
+        return []
+    with path.open("r", encoding="utf-8", newline="") as file_obj:
+        return list(csv.DictReader(file_obj))
+
+
+def _csv_has_columns(rows: List[Dict[str, str]], required: List[str]) -> bool:
+    if not rows:
+        return False
+    first = rows[0]
+    return all(column in first for column in required)
+
+
+def _maybe_float(value: str) -> float:
+    if value in {"", "nan", "NaN", "None", None}:
+        return float("nan")
+    if value == "inf":
+        return float("inf")
+    if value == "-inf":
+        return float("-inf")
+    return float(value)
+
+
+def _moving_average(values: np.ndarray, window: Optional[int] = None) -> np.ndarray:
+    if values.size == 0:
+        return values
+    chosen_window = window or min(10, max(values.size, 1))
+    chosen_window = max(1, int(chosen_window))
+    if np.all(np.isnan(values)):
+        return values
+    fill_value = np.nanmedian(values[np.isfinite(values)]) if np.isfinite(values).any() else 0.0
+    safe_values = np.where(np.isfinite(values), values, fill_value)
+    return uniform_filter1d(safe_values, size=chosen_window, mode="nearest")
+
+
+def _skip_plot(save_path: str | Path, reason: str):
+    print(f"Skipping {Path(save_path).name}: {reason}")
+    return None
 
 
 class NetworkTopologyVisualizer:
@@ -120,8 +163,19 @@ class NetworkTopologyVisualizer:
         if not checkpoint_path or not os.path.exists(checkpoint_path):
             return None
 
+        payload = torch.load(checkpoint_path, map_location=device)
+        metadata = payload.get("metadata", {}) if isinstance(payload, dict) else {}
+        gnn_input_dim = int(metadata.get("gnn_input_dim", 6))
+        gnn_hidden_dim = int(metadata.get("gnn_hidden_dim", 64))
+        include_node_index = bool(metadata.get("include_node_index", False))
+
         adjacency, edge_features, _ = env._get_adjacency_info()
-        graph_builder = ORANGraphBuilder(env.num_rhs, env.num_ess, env.num_rcs)
+        graph_builder = ORANGraphBuilder(
+            env.num_rhs,
+            env.num_ess,
+            env.num_rcs,
+            include_node_index=include_node_index,
+        )
         graph = graph_builder.build_graph(
             env.rh_demands,
             env.rh_latencies,
@@ -131,7 +185,7 @@ class NetworkTopologyVisualizer:
             edge_features,
         ).to(device)
 
-        gnn = GNNFeatureExtractor(input_dim=6, hidden_dim=64, output_dim=128).to(device)
+        gnn = GNNFeatureExtractor(input_dim=gnn_input_dim, hidden_dim=gnn_hidden_dim, output_dim=128).to(device)
         agent = PPOAgent(
             feature_dim=128,
             num_rhs=env.num_rhs,
@@ -141,7 +195,6 @@ class NetworkTopologyVisualizer:
             device=device,
         )
 
-        payload = torch.load(checkpoint_path, map_location=device)
         agent.load(checkpoint_path)
         if isinstance(payload, dict) and payload.get("gnn_state_dict") is not None:
             gnn.load_state_dict(payload["gnn_state_dict"])
@@ -578,6 +631,310 @@ class TrainingVisualization:
             print(f"✓ Saved: {save_path}")
 
         return fig, axes
+
+    @staticmethod
+    def plot_training_metrics_from_csv(csv_path: str, save_path: str = None, figsize: Tuple = (16, 10)):
+        rows = _load_csv_rows(csv_path)
+        required = ["episode", "reward", "cost", "valid_rate", "total_reconfig_changes"]
+        if not _csv_has_columns(rows, required):
+            return _skip_plot(save_path or csv_path, f"missing required columns: {required}")
+
+        episodes = np.asarray([_maybe_float(row["episode"]) for row in rows], dtype=float)
+        rewards = np.asarray([_maybe_float(row["reward"]) for row in rows], dtype=float)
+        costs = np.asarray([_maybe_float(row["cost"]) for row in rows], dtype=float)
+        valid_rate = np.asarray([100.0 * _maybe_float(row["valid_rate"]) for row in rows], dtype=float)
+        reconfig = np.asarray([_maybe_float(row["total_reconfig_changes"]) for row in rows], dtype=float)
+
+        fig, axes = plt.subplots(2, 2, figsize=figsize, facecolor="white")
+        metric_specs = [
+            (rewards, "Reward vs Episode", "Reward", "#e76f51", True),
+            (np.where(np.isfinite(costs), costs, np.nan), "Cost vs Episode", "Cost", "#2a9d8f", True),
+            (valid_rate, "Valid Rate vs Episode", "Valid Rate (%)", "#457b9d", False),
+            (reconfig, "Reconfiguration Changes vs Episode", "Total Reconfig Changes", "#f4a261", True),
+        ]
+
+        for ax, (values, title, ylabel, color, smooth) in zip(axes.flat, metric_specs):
+            ax.plot(episodes, values, linewidth=2.0, color=color, alpha=0.85)
+            if smooth:
+                ax.plot(episodes, _moving_average(values), linewidth=2.0, color="black", linestyle="--", alpha=0.75)
+            ax.set_title(title, fontsize=12, fontweight="bold")
+            ax.set_xlabel("Episode", fontsize=11, fontweight="bold")
+            ax.set_ylabel(ylabel, fontsize=11, fontweight="bold")
+            ax.grid(True, alpha=0.3)
+
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches="tight", facecolor="white")
+            print(f"✓ Saved: {save_path}")
+        return fig, axes
+
+    @staticmethod
+    def plot_cost_components_from_csv(csv_path: str, save_path: str = None, figsize: Tuple = (14, 6)):
+        rows = _load_csv_rows(csv_path)
+        labels = ["processing_cost", "routing_cost", "reconfiguration_cost", "sla_penalty"]
+        required = ["episode", *labels]
+        if not _csv_has_columns(rows, required):
+            return _skip_plot(save_path or csv_path, f"missing required columns: {required}")
+
+        episodes = np.asarray([_maybe_float(row["episode"]) for row in rows], dtype=float)
+        fig, ax = plt.subplots(figsize=figsize, facecolor="white")
+        colors = ["#e76f51", "#2a9d8f", "#e9c46a", "#457b9d"]
+        for label, color in zip(labels, colors):
+            values = np.asarray([_maybe_float(row[label]) for row in rows], dtype=float)
+            ax.plot(episodes, _moving_average(values), linewidth=2.2, label=label, color=color)
+        ax.set_title("Cost Component Trends", fontsize=13, fontweight="bold")
+        ax.set_xlabel("Episode", fontsize=11, fontweight="bold")
+        ax.set_ylabel("Cost", fontsize=11, fontweight="bold")
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc="best")
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches="tight", facecolor="white")
+            print(f"✓ Saved: {save_path}")
+        return fig, ax
+
+    @staticmethod
+    def plot_split_usage_over_training_from_csv(csv_path: str, save_path: str = None, figsize: Tuple = (14, 6)):
+        rows = _load_csv_rows(csv_path)
+        split_columns = ["split_s1_count", "split_s2_count", "split_s3_count", "split_s4_count"]
+        required = ["episode", *split_columns]
+        if not _csv_has_columns(rows, required):
+            return _skip_plot(save_path or csv_path, f"missing required columns: {required}")
+
+        episodes = np.asarray([_maybe_float(row["episode"]) for row in rows], dtype=float)
+        counts = {column: np.asarray([_maybe_float(row[column]) for row in rows], dtype=float) for column in split_columns}
+        totals = np.maximum(sum(counts.values()), 1.0)
+
+        fig, ax = plt.subplots(figsize=figsize, facecolor="white")
+        colors = ["#f94144", "#f3722c", "#f9c74f", "#90be6d"]
+        for column, color, label in zip(split_columns, colors, ["S1", "S2", "S3", "S4"]):
+            pct = 100.0 * counts[column] / totals
+            ax.plot(episodes, _moving_average(pct), linewidth=2.2, color=color, label=label)
+        ax.set_title("Split Usage Over Training", fontsize=13, fontweight="bold")
+        ax.set_xlabel("Episode", fontsize=11, fontweight="bold")
+        ax.set_ylabel("Split Usage (%)", fontsize=11, fontweight="bold")
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc="best")
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches="tight", facecolor="white")
+            print(f"✓ Saved: {save_path}")
+        return fig, ax
+
+    @staticmethod
+    def plot_evaluation_topology_summary_from_csv(csv_path: str, save_path: str = None, figsize: Tuple = (16, 8)):
+        rows = _load_csv_rows(csv_path)
+        required = ["topology_id", "pool_type", "avg_reward", "avg_cost", "valid_rate", "avg_sla_penalty"]
+        if not _csv_has_columns(rows, required):
+            return _skip_plot(save_path or csv_path, f"missing required columns: {required}")
+
+        topology_ids = [row["topology_id"] for row in rows]
+        pool_types = [row["pool_type"] for row in rows]
+        x = np.arange(len(rows))
+        colors = ["#e76f51" if pool == "train" else "#457b9d" for pool in pool_types]
+        fig, axes = plt.subplots(2, 2, figsize=figsize, facecolor="white")
+        metric_specs = [
+            ("avg_reward", "Average Reward"),
+            ("avg_cost", "Average Cost"),
+            ("valid_rate", "Valid Rate"),
+            ("avg_sla_penalty", "Average SLA Penalty"),
+        ]
+        for ax, (column, title) in zip(axes.flat, metric_specs):
+            values = np.asarray([_maybe_float(row[column]) for row in rows], dtype=float)
+            if column == "valid_rate":
+                values = 100.0 * values
+            ax.bar(x, values, color=colors, edgecolor="black", linewidth=1.0)
+            ax.set_xticks(x)
+            ax.set_xticklabels(topology_ids, rotation=25, ha="right")
+            ax.set_title(title, fontsize=12, fontweight="bold")
+            ax.grid(True, axis="y", alpha=0.3)
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches="tight", facecolor="white")
+            print(f"✓ Saved: {save_path}")
+        return fig, axes
+
+    @staticmethod
+    def plot_eval_split_distribution_by_topology_from_csv(csv_path: str, save_path: str = None, figsize: Tuple = (14, 6)):
+        rows = _load_csv_rows(csv_path)
+        split_columns = ["split_s1_pct", "split_s2_pct", "split_s3_pct", "split_s4_pct"]
+        required = ["topology_id", *split_columns]
+        if not _csv_has_columns(rows, required):
+            return _skip_plot(save_path or csv_path, f"missing required columns: {required}")
+
+        topology_ids = [row["topology_id"] for row in rows]
+        x = np.arange(len(rows))
+        bottom = np.zeros(len(rows), dtype=float)
+        colors = ["#f94144", "#f3722c", "#f9c74f", "#90be6d"]
+        fig, ax = plt.subplots(figsize=figsize, facecolor="white")
+        for column, color, label in zip(split_columns, colors, ["S1", "S2", "S3", "S4"]):
+            values = np.asarray([100.0 * _maybe_float(row[column]) for row in rows], dtype=float)
+            ax.bar(x, values, bottom=bottom, color=color, edgecolor="black", linewidth=1.0, label=label)
+            bottom += values
+        ax.set_xticks(x)
+        ax.set_xticklabels(topology_ids, rotation=25, ha="right")
+        ax.set_ylabel("Split Distribution (%)", fontsize=11, fontweight="bold")
+        ax.set_title("Evaluation Split Distribution by Topology", fontsize=13, fontweight="bold")
+        ax.grid(True, axis="y", alpha=0.3)
+        ax.legend(loc="best")
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches="tight", facecolor="white")
+            print(f"✓ Saved: {save_path}")
+        return fig, ax
+
+    @staticmethod
+    def plot_invalid_reason_summary_from_csv(csv_path: str, save_path: str = None, figsize: Tuple = (16, 6)):
+        rows = _load_csv_rows(csv_path)
+        reason_columns = [
+            "missing_direct_rc_link",
+            "missing_rh_es_link",
+            "missing_es_rc_link",
+            "es_capacity_exceeded",
+            "rc_capacity_exceeded",
+            "bandwidth_exceeded",
+            "e2e_latency_exceeded",
+            "crosshaul_latency_exceeded",
+        ]
+        required = ["scope", "topology_id", *reason_columns]
+        if not _csv_has_columns(rows, required):
+            return _skip_plot(save_path or csv_path, f"missing required columns: {required}")
+
+        labels = [f"{row['scope']}:{row['topology_id']}" for row in rows]
+        x = np.arange(len(rows))
+        bottom = np.zeros(len(rows), dtype=float)
+        colors = ["#264653", "#2a9d8f", "#8ab17d", "#e9c46a", "#f4a261", "#e76f51", "#9d4edd", "#577590"]
+        fig, ax = plt.subplots(figsize=figsize, facecolor="white")
+        for column, color in zip(reason_columns, colors):
+            values = np.asarray([_maybe_float(row[column]) for row in rows], dtype=float)
+            ax.bar(x, values, bottom=bottom, color=color, edgecolor="black", linewidth=0.8, label=column)
+            bottom += values
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels, rotation=30, ha="right")
+        ax.set_ylabel("Count", fontsize=11, fontweight="bold")
+        ax.set_title("Invalid Reason Summary", fontsize=13, fontweight="bold")
+        ax.grid(True, axis="y", alpha=0.3)
+        ax.legend(loc="upper right", fontsize=8)
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches="tight", facecolor="white")
+            print(f"✓ Saved: {save_path}")
+        return fig, ax
+
+    @staticmethod
+    def plot_timing_profile_from_csv(csv_path: str, save_path: str = None, figsize: Tuple = (10, 6)):
+        rows = _load_csv_rows(csv_path)
+        required = ["run_id", "reset_time", "graph_time", "gnn_time", "action_time", "env_step_time", "ppo_update_time"]
+        if not _csv_has_columns(rows, required):
+            return _skip_plot(save_path or csv_path, f"missing required columns: {required}")
+
+        row = rows[-1]
+        labels = ["reset_time", "graph_time", "gnn_time", "action_time", "env_step_time", "ppo_update_time"]
+        values = np.asarray([_maybe_float(row[label]) for label in labels], dtype=float)
+        fig, ax = plt.subplots(figsize=figsize, facecolor="white")
+        ax.bar(labels, values, color=["#8ecae6", "#219ebc", "#023047", "#ffb703", "#fb8500", "#e63946"], edgecolor="black", linewidth=1.0)
+        ax.set_title(f"Timing Profile | {row['run_id']}", fontsize=13, fontweight="bold")
+        ax.set_ylabel("Seconds", fontsize=11, fontweight="bold")
+        ax.set_xticks(np.arange(len(labels)))
+        ax.set_xticklabels(labels, rotation=25, ha="right")
+        ax.grid(True, axis="y", alpha=0.3)
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches="tight", facecolor="white")
+            print(f"✓ Saved: {save_path}")
+        return fig, ax
+
+    @staticmethod
+    def plot_episode_trace_from_csv(csv_path: str, save_path: str = None, figsize: Tuple = (16, 10)):
+        rows = _load_csv_rows(csv_path)
+        required = [
+            "slot", "deployment_cost", "reward", "reconfiguration_cost", "split_changes",
+            "es_changes", "rc_changes", "e2e_violation", "crosshaul_violation", "invalid_reasons"
+        ]
+        if not _csv_has_columns(rows, required):
+            return _skip_plot(save_path or csv_path, f"missing required columns: {required}")
+
+        slots = np.asarray([_maybe_float(row["slot"]) for row in rows], dtype=float)
+        deployment_cost = np.asarray([_maybe_float(row["deployment_cost"]) for row in rows], dtype=float)
+        reward = np.asarray([_maybe_float(row["reward"]) for row in rows], dtype=float)
+        reconfig_cost = np.asarray([_maybe_float(row["reconfiguration_cost"]) for row in rows], dtype=float)
+        split_changes = np.asarray([_maybe_float(row["split_changes"]) for row in rows], dtype=float)
+        es_changes = np.asarray([_maybe_float(row["es_changes"]) for row in rows], dtype=float)
+        rc_changes = np.asarray([_maybe_float(row["rc_changes"]) for row in rows], dtype=float)
+        e2e = np.asarray([_maybe_float(row["e2e_violation"]) for row in rows], dtype=float)
+        crosshaul = np.asarray([_maybe_float(row["crosshaul_violation"]) for row in rows], dtype=float)
+        invalid_mask = np.asarray([1.0 if row["invalid_reasons"] else 0.0 for row in rows], dtype=float)
+
+        fig, axes = plt.subplots(3, 2, figsize=figsize, facecolor="white")
+        series = [
+            (deployment_cost, "Deployment Cost per Slot", "Cost", "#2a9d8f"),
+            (reward, "Reward per Slot", "Reward", "#e76f51"),
+            (reconfig_cost, "Reconfiguration Cost per Slot", "Reconfig Cost", "#f4a261"),
+            (split_changes + es_changes + rc_changes, "Total Reconfiguration Changes", "Changes", "#457b9d"),
+            (e2e, "E2E Violation per Slot", "Violation", "#9d4edd"),
+            (crosshaul, "Crosshaul Violation per Slot", "Violation", "#264653"),
+        ]
+        for ax, (values, title, ylabel, color) in zip(axes.flat, series):
+            plot_values = np.where(np.isfinite(values), values, np.nan)
+            ax.plot(slots, plot_values, linewidth=2.0, color=color)
+            flagged_x = slots[invalid_mask > 0]
+            flagged_y = plot_values[invalid_mask > 0]
+            if flagged_x.size:
+                ax.scatter(flagged_x, flagged_y, s=18, color="#d00000", alpha=0.7)
+            ax.set_title(title, fontsize=11, fontweight="bold")
+            ax.set_xlabel("Slot", fontsize=10, fontweight="bold")
+            ax.set_ylabel(ylabel, fontsize=10, fontweight="bold")
+            ax.grid(True, alpha=0.3)
+
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches="tight", facecolor="white")
+            print(f"✓ Saved: {save_path}")
+        return fig, axes
+
+    @staticmethod
+    def plot_stationarity_summary_from_trace_csvs(csv_paths: List[str | Path], save_path: str = None, figsize: Tuple = (14, 6)):
+        rows = []
+        for csv_path in csv_paths:
+            trace_rows = _load_csv_rows(csv_path)
+            required = ["split_changes", "es_changes", "rc_changes"]
+            if not _csv_has_columns(trace_rows, required):
+                continue
+            split_total = sum(_maybe_float(row["split_changes"]) for row in trace_rows)
+            es_total = sum(_maybe_float(row["es_changes"]) for row in trace_rows)
+            rc_total = sum(_maybe_float(row["rc_changes"]) for row in trace_rows)
+            rows.append(
+                {
+                    "name": Path(csv_path).stem,
+                    "split_changes": split_total,
+                    "es_changes": es_total,
+                    "rc_changes": rc_total,
+                    "total_reconfig_changes": split_total + es_total + rc_total,
+                }
+            )
+
+        if not rows:
+            return _skip_plot(save_path or "20_stationarity_summary.png", "no trace CSVs with required columns")
+
+        names = [row["name"] for row in rows]
+        x = np.arange(len(rows))
+        width = 0.25
+        fig, ax = plt.subplots(figsize=figsize, facecolor="white")
+        ax.bar(x - width, [row["split_changes"] for row in rows], width, label="split_changes", color="#f94144")
+        ax.bar(x, [row["es_changes"] for row in rows], width, label="es_changes", color="#2a9d8f")
+        ax.bar(x + width, [row["rc_changes"] for row in rows], width, label="rc_changes", color="#457b9d")
+        ax.plot(x, [row["total_reconfig_changes"] for row in rows], color="black", marker="o", linewidth=2.0, label="total_reconfig_changes")
+        ax.set_xticks(x)
+        ax.set_xticklabels(names, rotation=25, ha="right")
+        ax.set_ylabel("Total Changes", fontsize=11, fontweight="bold")
+        ax.set_title("Stationarity Summary Across Episode Traces", fontsize=13, fontweight="bold")
+        ax.grid(True, axis="y", alpha=0.3)
+        ax.legend(loc="best")
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches="tight", facecolor="white")
+            print(f"✓ Saved: {save_path}")
+        return fig, ax
 
 
 class ActionSpaceVisualizer:

@@ -339,7 +339,14 @@ class EpisodeTraceAnimator:
             for (u, v), color in zip(decision_edges, decision_colors):
                 nx.draw_networkx_edges(graph, pos, edgelist=[(u, v)], ax=ax_graph, edge_color=color, width=4.2, alpha=0.95)
 
-            valid_text = "valid" if slot["valid_deployment"] else "invalid"
+            if slot["valid_deployment"]:
+                valid_text = (
+                    "structurally valid with soft violations"
+                    if slot["invalid_reasons"]
+                    else "valid"
+                )
+            else:
+                valid_text = "invalid"
             cost_text = slot["deployment_cost"]
             ax_graph.set_title(
                 f"Single Time-Slot Decision Snapshot | {topology_id} | slot {slot['time_slot']}/{trace['episode_length_time_slots']} | {valid_text} | cost={cost_text}",
@@ -350,6 +357,13 @@ class EpisodeTraceAnimator:
             ax_graph.axis("off")
 
             ax_summary.axis("off")
+            if slot["valid_deployment"]:
+                reason_label = "Soft violations" if slot["invalid_reasons"] else "Soft violations"
+                reason_text = ", ".join(slot["invalid_reasons"]) if slot["invalid_reasons"] else "none"
+            else:
+                reason_label = "Invalid reasons"
+                reason_text = ", ".join(slot["invalid_reasons"]) if slot["invalid_reasons"] else "none"
+
             summary_lines = [
                 "Paper-Aligned Episode Summary",
                 f"Benchmark: {trace['benchmark']}",
@@ -369,7 +383,7 @@ class EpisodeTraceAnimator:
                 f"Current slot reconfig cost: {slot['reconfiguration_cost']:.3f}",
                 f"Current slot SLA penalty: {slot['sla_penalty']:.3f}",
                 f"Current slot changes: split={slot['split_changes']} es={slot['es_changes']} rc={slot['rc_changes']}",
-                f"Invalid reasons: {', '.join(slot['invalid_reasons']) if slot['invalid_reasons'] else 'none'}",
+                f"{reason_label}: {reason_text}",
             ]
             ax_summary.text(
                 0.02,

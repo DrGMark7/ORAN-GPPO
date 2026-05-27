@@ -19,6 +19,14 @@ from src.core import (
     get_topology_spec,
     get_benchmark_dimensions,
 )
+from src.workflows.paper_training import _run_paper_mode_from_args
+from src.workflows.training_constants import (
+    PAPER_GNN_HIDDEN_DIM,
+    PAPER_NUM_ENVS,
+    PAPER_NUM_SEEDS,
+    PAPER_TIMESTEPS,
+)
+from src.workflows.training_csv import _export_csv_artifacts, _write_episode_trace_csv
 
 
 def _zero_cost_breakdown() -> Dict[str, float]:
@@ -340,7 +348,35 @@ def train_gppo(
     topology_selection_mode: str = "random_per_reset",
     constraint_mode: str = "legacy",
     train_topology_id: Optional[str] = None,
+    total_timesteps: Optional[int] = None,
+    num_envs: int = 1,
+    gnn_hidden_dim: int = 64,
+    gnn_input_dim: int = 6,
+    include_node_index: bool = False,
+    paper_mode: bool = False,
 ) -> Tuple[PPOAgent, torch.nn.Module, dict]:
+    if num_envs > 1 or total_timesteps is not None:
+        from src.workflows.vectorized_training import _train_gppo_sync_vectorized
+
+        return _train_gppo_sync_vectorized(
+            total_timesteps=total_timesteps or num_episodes * max_steps * num_envs,
+            max_steps=max_steps,
+            batch_size=batch_size,
+            device=device,
+            seed=seed,
+            results_path=results_path,
+            checkpoint_path=checkpoint_path,
+            benchmark=benchmark,
+            topology_selection_mode=topology_selection_mode,
+            constraint_mode=constraint_mode,
+            train_topology_id=train_topology_id,
+            num_envs=num_envs,
+            gnn_hidden_dim=gnn_hidden_dim,
+            gnn_input_dim=gnn_input_dim,
+            include_node_index=include_node_index,
+            paper_mode=paper_mode,
+        )
+
     train_start_time = time.perf_counter()
     timing_stats = _zero_timing_stats()
     np.random.seed(seed)
@@ -365,8 +401,8 @@ def train_gppo(
         constraint_mode=constraint_mode,
         topology_id=train_topology_id,
     )
-    gnn = GNNFeatureExtractor(input_dim=6, hidden_dim=64, output_dim=128).to(device)
-    graph_builder = ORANGraphBuilder(env.num_rhs, env.num_ess, env.num_rcs)
+    gnn = GNNFeatureExtractor(input_dim=gnn_input_dim, hidden_dim=gnn_hidden_dim, output_dim=128).to(device)
+    graph_builder = ORANGraphBuilder(env.num_rhs, env.num_ess, env.num_rcs, include_node_index=include_node_index)
     agent = PPOAgent(
         feature_dim=128,
         num_rhs=env.num_rhs,
@@ -596,12 +632,18 @@ def train_gppo(
             "constraint_mode": constraint_mode,
             "episode_length_time_slots": max_steps,
             "paper_aligned_episode_length": max_steps == 288,
+            "paper_mode": paper_mode,
+            "paper_total_timesteps": total_timesteps,
+            "paper_num_envs": num_envs,
             "seed": config.seed,
             "dimensions": {
                 "num_rhs": env.num_rhs,
                 "num_ess": env.num_ess,
                 "num_rcs": env.num_rcs,
             },
+            "gnn_hidden_dim": gnn_hidden_dim,
+            "gnn_input_dim": gnn_input_dim,
+            "include_node_index": include_node_index,
         },
         "benchmark_audit": _collect_benchmark_audit(benchmark, env.crosshaul_latency_limits),
         "episode_rewards": episode_rewards,
@@ -723,6 +765,13 @@ def train_gppo(
             "train_selection_mode": topology_selection_mode,
             "constraint_mode": constraint_mode,
             "episode_length_time_slots": max_steps,
+            "paper_mode": paper_mode,
+            "paper_total_timesteps": total_timesteps,
+            "paper_num_envs": num_envs,
+            "gnn_hidden_dim": gnn_hidden_dim,
+            "gnn_input_dim": gnn_input_dim,
+            "include_node_index": include_node_index,
+            "checkpoint_family": "paper_gppo" if paper_mode else "project_gppo",
         },
     )
     timing_stats["checkpoint_save_seconds"] += time.perf_counter() - checkpoint_save_start
@@ -813,6 +862,8 @@ def evaluate_gppo(
     max_steps: int = 50,
     export_episode_traces: bool = True,
     verbose: bool = True,
+    csv_output_dir: Optional[Path] = None,
+    include_node_index: bool = False,
 ) -> Dict[str, object]:
     env = _build_env(
         benchmark=benchmark,
@@ -822,7 +873,7 @@ def evaluate_gppo(
         constraint_mode=constraint_mode,
         topology_id=topology_id,
     )
-    graph_builder = ORANGraphBuilder(env.num_rhs, env.num_ess, env.num_rcs)
+    graph_builder = ORANGraphBuilder(env.num_rhs, env.num_ess, env.num_rcs, include_node_index=include_node_index)
 
     rewards = []
     costs = []
@@ -834,6 +885,7 @@ def evaluate_gppo(
     bounded_strict_feasibility_probe = []
     episode_reconfiguration_stats = []
     episode_trace_paths = []
+    episode_trace_csv_paths = []
     per_topology: Dict[str, Dict[str, object]] = {}
     invalid_counts_by_reason = _zero_failure_counts()
     latency_diagnostics = _collect_topology_latency_diagnostics(env.topology_id, env.crosshaul_latency_limits)
@@ -865,6 +917,7 @@ def evaluate_gppo(
                 "valid_steps": 0,
                 "total_time_slots": 0,
                 "resets": 0,
+                "structurally_valid_resets": 0,
                 "strictly_valid_resets": 0,
                 "exact_strictly_valid_resets": 0,
                 "invalid_reason_events": 0,
@@ -882,6 +935,7 @@ def evaluate_gppo(
             },
         )
         topology_summary["resets"] += 1
+        topology_summary["structurally_valid_resets"] += int(bool(reset_info.get("has_structurally_valid_action", False)))
         topology_summary["strictly_valid_resets"] += int(bool(reset_info.get("has_strictly_valid_action", False)))
         if reset_info.get("has_exact_strictly_valid_action") is True:
             topology_summary["exact_strictly_valid_resets"] += 1
@@ -948,11 +1002,18 @@ def evaluate_gppo(
                     "rc_choice_vector": [int(value) for value in rc_choices.tolist()],
                     "valid_deployment": bool(info["valid_deployment"]),
                     "deployment_cost": float(info["deployment_cost"]) if np.isfinite(info["deployment_cost"]) else "inf",
+                    "reward": float(reward),
                     "raw_total_cost": float(info["raw_total_cost"]),
                     "processing_cost": float(info["processing_cost"]),
                     "routing_cost": float(info["routing_cost"]),
                     "reconfiguration_cost": float(info["reconfiguration_cost"]),
                     "sla_penalty": float(info["sla_penalty"]),
+                    "es_overuse": float(info["es_overuse"]),
+                    "rc_overuse": float(info["rc_overuse"]),
+                    "bandwidth_overuse": float(info["bandwidth_overuse"]),
+                    "e2e_violation": float(info["e2e_violation"]),
+                    "crosshaul_violation": float(info["crosshaul_violation"]),
+                    "failed_links": int(info["failed_links"]),
                     "split_changes": int(info["split_changes"]),
                     "es_changes": int(info["es_changes"]),
                     "rc_changes": int(info["rc_changes"]),
@@ -1015,6 +1076,17 @@ def evaluate_gppo(
                 slots=episode_slots,
                 episode_reward=float(episode_reward),
             )
+            if csv_output_dir is not None:
+                trace_csv_path = _write_episode_trace_csv(
+                    trace_path=trace_path,
+                    csv_output_dir=csv_output_dir,
+                    benchmark=benchmark,
+                    topology_pool_name=topology_pool_name,
+                    constraint_mode=constraint_mode,
+                    episode_index=episode,
+                    slots=episode_slots,
+                )
+                episode_trace_csv_paths.append(str(trace_csv_path))
             episode_trace_paths.append(str(trace_path))
 
     finite_costs = [cost for cost in costs if np.isfinite(cost)]
@@ -1031,6 +1103,7 @@ def evaluate_gppo(
         "has_exact_strictly_valid_action": has_exact_strictly_valid_action,
         "bounded_strict_feasibility_probe": bounded_strict_feasibility_probe,
         "episode_trace_paths": episode_trace_paths,
+        "episode_trace_csv_paths": episode_trace_csv_paths,
         "avg_reward": float(np.mean(rewards)),
         "std_reward": float(np.std(rewards)),
         "avg_cost": float(np.mean(finite_costs)) if finite_costs else float("inf"),
@@ -1074,8 +1147,13 @@ def evaluate_gppo(
         total_steps = max(int(topology_summary["total_time_slots"]), 1)
         summary["per_topology"][topology_id] = {
             "mean_reward": float(np.mean(topology_summary["rewards"])),
+            "std_reward": float(np.std(topology_summary["rewards"])),
             "mean_cost": float(np.mean(topology_costs)) if topology_costs else float("inf"),
+            "std_cost": float(np.std(topology_costs)) if topology_costs else float("inf"),
             "validity_rate": float(topology_summary["valid_steps"] / total_steps),
+            "structural_validity_rate_at_reset": float(
+                topology_summary["structurally_valid_resets"] / max(int(topology_summary["resets"]), 1)
+            ),
             "strict_feasible_reset_rate": float(topology_summary["strictly_valid_resets"] / max(int(topology_summary["resets"]), 1)),
             "exact_strict_feasible_reset_count": int(topology_summary["exact_strictly_valid_resets"]),
             "avg_invalid_reasons_per_time_slot": float(topology_summary["invalid_reason_events"] / total_steps),
@@ -1183,6 +1261,8 @@ def evaluate_pool_by_topology(
     device: str,
     constraint_mode: str,
     max_steps: int,
+    csv_output_dir: Optional[Path] = None,
+    include_node_index: bool = False,
 ) -> Dict[str, object]:
     topology_ids = DEFAULT_BENCHMARK_TOPOLOGY_POOLS[benchmark][topology_pool_name]
     summaries = {}
@@ -1198,6 +1278,8 @@ def evaluate_pool_by_topology(
             constraint_mode=constraint_mode,
             topology_id=topology_id,
             max_steps=max_steps,
+            csv_output_dir=csv_output_dir,
+            include_node_index=include_node_index,
         )
     return summaries
 
@@ -1211,6 +1293,7 @@ def compare_constraint_modes_on_pool(
     num_episodes: int,
     device: str,
     max_steps: int,
+    include_node_index: bool = False,
 ) -> Dict[str, object]:
     staged_modes = [
         "legacy",
@@ -1236,6 +1319,7 @@ def compare_constraint_modes_on_pool(
                 max_steps=max_steps,
                 export_episode_traces=False,
                 verbose=False,
+                include_node_index=include_node_index,
             )
         legacy = mode_summaries["legacy"]
         strict = mode_summaries["strict_full"]
@@ -1291,11 +1375,16 @@ def build_train_parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--max-steps", type=int, default=50, help="Time slots per episode")
     parser.add_argument("--paper-episode-length", action="store_true", help="Use the paper-aligned 288 time-slot episode horizon")
+    parser.add_argument("--paper-mode", action="store_true", help="Run the paper-faithful preset without removing project/debug modes")
+    parser.add_argument("--paper-timesteps", type=int, default=PAPER_TIMESTEPS, help="Paper-mode timesteps per seed")
+    parser.add_argument("--paper-num-envs", type=int, default=PAPER_NUM_ENVS, help="Paper-mode synchronous parallel environments")
+    parser.add_argument("--paper-num-seeds", type=int, default=PAPER_NUM_SEEDS, help="Paper-mode random seeds for aggregate reporting")
+    parser.add_argument("--paper-gnn-hidden-dim", type=int, default=PAPER_GNN_HIDDEN_DIM, help="Paper-mode GNN hidden size")
     parser.add_argument("--batch-size", type=int, default=128, help="PPO batch size")
     parser.add_argument("--results-path", type=Path, default=DEFAULT_RESULTS_PATH, help="Output JSON path")
     parser.add_argument("--checkpoint-path", type=Path, default=DEFAULT_CHECKPOINT_PATH, help="Output checkpoint path")
     parser.add_argument("--skip-eval", action="store_true", help="Skip post-training evaluation")
-    parser.add_argument("--eval-episodes", type=int, default=10, help="Number of evaluation episodes per pool")
+    parser.add_argument("--eval-episodes", type=int, default=1, help="Number of evaluation episodes per pool")
     parser.add_argument(
         "--topology-selection-mode",
         choices=["fixed", "random_per_reset"],
@@ -1320,6 +1409,10 @@ def build_train_parser() -> argparse.ArgumentParser:
 
 
 def run_training_from_args(args: argparse.Namespace) -> None:
+    if args.paper_mode:
+        _run_paper_mode_from_args(args)
+        return
+
     effective_max_steps = 288 if args.paper_episode_length else args.max_steps
     agent, gnn, results = train_gppo(
         num_episodes=args.episodes,
@@ -1345,6 +1438,7 @@ def run_training_from_args(args: argparse.Namespace) -> None:
             device=args.device,
             constraint_mode=args.constraint_mode,
             max_steps=effective_max_steps,
+            csv_output_dir=args.results_path.parent,
         )
         train_eval_done = time.perf_counter()
         test_eval = evaluate_pool_by_topology(
@@ -1356,6 +1450,7 @@ def run_training_from_args(args: argparse.Namespace) -> None:
             device=args.device,
             constraint_mode=args.constraint_mode,
             max_steps=effective_max_steps,
+            csv_output_dir=args.results_path.parent,
         )
         eval_done = time.perf_counter()
         results["evaluation"] = {
@@ -1415,8 +1510,26 @@ def run_training_from_args(args: argparse.Namespace) -> None:
                             f"cost={mode_summary['avg_cost']:.3f} "
                             f"invalid={invalid_text}"
                         )
-        with args.results_path.open("w", encoding="utf-8") as file_obj:
-            json.dump(results, file_obj, indent=2)
+    csv_paths = _export_csv_artifacts(results, args.results_path)
+    trace_csv_paths = []
+    for pool_results in results.get("evaluation", {}).values():
+        for topology_eval in pool_results.values():
+            trace_csv_paths.extend(topology_eval.get("episode_trace_csv_paths", []))
+    if trace_csv_paths:
+        csv_paths["episode_trace_csvs"] = trace_csv_paths
+    results["csv_exports"] = csv_paths
+
+    with args.results_path.open("w", encoding="utf-8") as file_obj:
+        json.dump(results, file_obj, indent=2)
+
+    print("\nCSV Exports")
+    for name, value in results["csv_exports"].items():
+        if isinstance(value, list):
+            print(f"{name}:")
+            for item in value:
+                print(f"  {item}")
+        else:
+            print(f"{name}: {value}")
 
 
 def main(argv=None) -> None:

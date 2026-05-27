@@ -33,6 +33,14 @@ class GNNFeatureExtractor(nn.Module):
             edge_dim=2,
         )
         self.output_proj = nn.Linear(hidden_dim, output_dim)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.xavier_uniform_(module.weight)
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
 
     def forward(self, graph_data: Data) -> torch.Tensor:
         x = graph_data.x
@@ -55,11 +63,12 @@ class GNNFeatureExtractor(nn.Module):
 class ORANGraphBuilder:
     """Convert O-RAN state to PyTorch Geometric graph representation."""
 
-    def __init__(self, num_rhs: int, num_ess: int, num_rcs: int):
+    def __init__(self, num_rhs: int, num_ess: int, num_rcs: int, include_node_index: bool = False):
         self.num_rhs = num_rhs
         self.num_ess = num_ess
         self.num_rcs = num_rcs
         self.num_nodes = num_rhs + num_ess + num_rcs
+        self.include_node_index = include_node_index
 
     def build_graph(
         self,
@@ -72,35 +81,43 @@ class ORANGraphBuilder:
     ) -> Data:
         node_features = []
 
+        def add_node_index(features: list[float], node_idx: int) -> list[float]:
+            if not self.include_node_index:
+                return features
+            denominator = max(self.num_nodes - 1, 1)
+            return features + [float(node_idx / denominator)]
+
         for i in range(self.num_rhs):
-            node_features.append([
+            node_features.append(add_node_index([
                 1.0,
                 0.0,
                 0.0,
                 0.0,
                 rh_demands[i] / 300.0,
                 rh_latencies[i] / 200.0,
-            ])
+            ], i))
 
         for i in range(self.num_ess):
-            node_features.append([
+            node_idx = self.num_rhs + i
+            node_features.append(add_node_index([
                 0.0,
                 1.0,
                 0.0,
                 es_remaining[i] / 20.0,
                 0.0,
                 0.0,
-            ])
+            ], node_idx))
 
         for i in range(self.num_rcs):
-            node_features.append([
+            node_idx = self.num_rhs + self.num_ess + i
+            node_features.append(add_node_index([
                 0.0,
                 0.0,
                 1.0,
                 rc_remaining[i] / 100.0,
                 0.0,
                 0.0,
-            ])
+            ], node_idx))
 
         x = torch.FloatTensor(node_features)
 

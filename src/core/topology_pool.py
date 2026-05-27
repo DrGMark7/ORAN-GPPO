@@ -36,12 +36,12 @@ class TopologyPool:
     def _validate_group(self) -> None:
         specs = [self.registry[topology_id] for topology_id in self.topology_ids]
         first = specs[0]
-        expected = (first.num_rhs, first.num_ess, first.num_rcs, len(first.edges), first.benchmark)
+        expected = (first.num_rhs, first.num_ess, first.num_rcs, first.benchmark)
         for spec in specs[1:]:
-            current = (spec.num_rhs, spec.num_ess, spec.num_rcs, len(spec.edges), spec.benchmark)
+            current = (spec.num_rhs, spec.num_ess, spec.num_rcs, spec.benchmark)
             if current != expected:
                 raise ValueError(
-                    "Topology pools must keep a stable benchmark shape and edge count. "
+                    "Topology pools must keep a stable benchmark shape. "
                     f"Expected {expected}, got {current} for topology_id={spec.topology_id}"
                 )
 

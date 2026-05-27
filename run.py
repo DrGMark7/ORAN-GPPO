@@ -24,6 +24,8 @@ def main(argv=None) -> None:
         run_demo()
         return
     if args.task == "train":
+        if args.results_path is not None:
+            remaining = ["--results-path", str(args.results_path), *remaining]
         train_args = build_train_parser().parse_args(remaining)
         run_training_from_args(train_args)
         return
