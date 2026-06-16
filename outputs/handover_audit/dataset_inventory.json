@@ -1,0 +1,72 @@
+{
+  "dataset_groups": [
+    "slice_mixed",
+    "slice_traffic"
+  ],
+  "num_dataset_groups": 2,
+  "scenarios": [
+    "rome_slow_close",
+    "rome_static_close",
+    "rome_static_far",
+    "rome_static_medium"
+  ],
+  "num_scenarios": 4,
+  "training_folders": [
+    "tr0",
+    "tr1",
+    "tr2",
+    "tr3",
+    "tr4",
+    "tr5",
+    "tr6",
+    "tr7",
+    "tr8",
+    "tr9",
+    "tr10",
+    "tr11",
+    "tr12",
+    "tr13",
+    "tr14",
+    "tr15",
+    "tr16",
+    "tr17"
+  ],
+  "num_training_folders": 18,
+  "experiment_folders": [
+    "exp1",
+    "exp2",
+    "exp3",
+    "exp4",
+    "exp5",
+    "exp6"
+  ],
+  "num_experiment_folders": 6,
+  "num_base_station_folders": 2144,
+  "counts": {
+    "ue_csv_files": 21436,
+    "bs_csv_files": 2089,
+    "slice_metrics_csv_files": 21612
+  },
+  "missing_or_malformed_folders": [],
+  "num_missing_or_malformed_folders": 0,
+  "malformed_csv_files": [],
+  "unexpected_schemas": {},
+  "num_unexpected_schema_files": {},
+  "duplicate_or_observed_schemas": [
+    {
+      "count": 21612,
+      "example": "data/colosseum-oran-commag-dataset/slice_mixed/rome_static_close/tr6/exp1/bs3/slices_bs3/1010123456032_metrics.csv",
+      "header": "Timestamp,num_ues,IMSI,RNTI,,slicing_enabled,slice_id,slice_prb,power_multiplier,scheduling_policy,,dl_mcs,dl_n_samples,dl_buffer [bytes],tx_brate downlink [Mbps],tx_pkts downlink,tx_errors downlink (%),dl_cqi,,ul_mcs,ul_n_samples,ul_buffer [bytes],rx_brate uplink [Mbps],rx_pkts uplink,rx_errors uplink (%),ul_rssi,ul_sinr,phr,,sum_requested_prbs,sum_granted_prbs,,dl_pmi,dl_ri,ul_n,ul_turbo_iters"
+    },
+    {
+      "count": 21436,
+      "example": "data/colosseum-oran-commag-dataset/slice_mixed/rome_static_close/tr6/exp1/bs1/ue3.csv",
+      "header": "time,cc,pci,earfcn,rsrp,pl,cfo,dl_mcs,dl_snr,dl_turbo,dl_brate,dl_bler,ul_ta,ul_mcs,ul_buff,ul_brate,ul_bler,rf_o,rf_u,rf_l,is_attached"
+    },
+    {
+      "count": 2089,
+      "example": "data/colosseum-oran-commag-dataset/slice_mixed/rome_static_close/tr6/exp1/bs1/bs1.csv",
+      "header": "time,nof_ue,dl_brate,ul_brate"
+    }
+  ]
+}

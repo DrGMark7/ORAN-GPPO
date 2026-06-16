@@ -1,0 +1,192 @@
+{
+  "benchmark": "small",
+  "topology_pool_name": "train",
+  "topology_id": "small_clustered_train_b",
+  "constraint_mode": "legacy",
+  "episode_index": 0,
+  "episode_length_time_slots": 2,
+  "reset_info": {
+    "time_slot": 0,
+    "episode_length_time_slots": 2,
+    "has_structurally_valid_action": true,
+    "has_strictly_valid_action": false,
+    "has_greedy_strictly_valid_action": false,
+    "has_exact_strictly_valid_action": false,
+    "bounded_strict_feasibility_probe": {
+      "result": false,
+      "rhs_considered": 8,
+      "visit_limit": 50000,
+      "is_full_instance": true,
+      "is_exact": true,
+      "status": "exact"
+    },
+    "topology_metadata": {
+      "generator_seed": 202,
+      "edge_count": 24,
+      "family": "clustered",
+      "difficulty": "moderate",
+      "description": "Clustered family with repeated RH-to-ES attachment patterns and shared bottlenecks.",
+      "benchmark_label": "project_small",
+      "paper_aligned": false,
+      "paper_aligned_large": false,
+      "direct_rc_probability": null
+    }
+  },
+  "summary": {
+    "total_split_changes": 0.0,
+    "total_es_changes": 0.0,
+    "total_rc_changes": 0.0,
+    "total_reconfiguration_changes": 0.0,
+    "total_reconfiguration_cost": 0.0,
+    "average_cost_per_slot": 67.69222640991211,
+    "average_reward_per_slot": 0.19162010096040696,
+    "valid_slot_percentage": 100.0
+  },
+  "slots": [
+    {
+      "time_slot": 1,
+      "topology_id": "small_clustered_train_b",
+      "split_vector": [
+        3,
+        1,
+        1,
+        0,
+        1,
+        0,
+        1,
+        2
+      ],
+      "es_choice_vector": [
+        0,
+        1,
+        0,
+        0,
+        1,
+        2,
+        0,
+        1
+      ],
+      "rc_choice_vector": [
+        0,
+        1,
+        0,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "valid_deployment": true,
+      "deployment_cost": 59.074974060058594,
+      "reward": 0.19624799927046704,
+      "raw_total_cost": 59.074974060058594,
+      "processing_cost": 53.358516693115234,
+      "routing_cost": 1.604670280379057,
+      "reconfiguration_cost": 0.0,
+      "sla_penalty": 4.111786842346191,
+      "es_overuse": 0.0,
+      "rc_overuse": 0.0,
+      "bandwidth_overuse": 0.0,
+      "e2e_violation": 0.8499871425628664,
+      "crosshaul_violation": 3.2617998123168945,
+      "failed_links": 0,
+      "split_changes": 0,
+      "es_changes": 0,
+      "rc_changes": 0,
+      "total_reconfiguration_changes": 0,
+      "split_usage": {
+        "S1": 2,
+        "S2": 4,
+        "S3": 1,
+        "S4": 1
+      },
+      "invalid_reasons": [
+        "e2e_latency_exceeded",
+        "crosshaul_latency_exceeded"
+      ],
+      "failure_counts": {
+        "missing_direct_rc_link": 0,
+        "missing_rh_es_link": 0,
+        "missing_es_rc_link": 0,
+        "es_capacity_exceeded": 0,
+        "rc_capacity_exceeded": 0,
+        "bandwidth_exceeded": 0,
+        "e2e_latency_exceeded": 1,
+        "crosshaul_latency_exceeded": 1
+      }
+    },
+    {
+      "time_slot": 2,
+      "topology_id": "small_clustered_train_b",
+      "split_vector": [
+        3,
+        1,
+        1,
+        0,
+        1,
+        0,
+        1,
+        2
+      ],
+      "es_choice_vector": [
+        0,
+        1,
+        0,
+        0,
+        1,
+        2,
+        0,
+        1
+      ],
+      "rc_choice_vector": [
+        0,
+        1,
+        0,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "valid_deployment": true,
+      "deployment_cost": 76.30947875976562,
+      "reward": 0.18699220265034688,
+      "raw_total_cost": 76.30947875976562,
+      "processing_cost": 67.02176666259766,
+      "routing_cost": 1.8742809916757048,
+      "reconfiguration_cost": 0.0,
+      "sla_penalty": 7.413432598114014,
+      "es_overuse": 2.9312515258789062,
+      "rc_overuse": 0.0,
+      "bandwidth_overuse": 0.0,
+      "e2e_violation": 1.2203813652038575,
+      "crosshaul_violation": 3.2617998123168945,
+      "failed_links": 0,
+      "split_changes": 0,
+      "es_changes": 0,
+      "rc_changes": 0,
+      "total_reconfiguration_changes": 0,
+      "split_usage": {
+        "S1": 2,
+        "S2": 4,
+        "S3": 1,
+        "S4": 1
+      },
+      "invalid_reasons": [
+        "es_capacity_exceeded",
+        "e2e_latency_exceeded",
+        "crosshaul_latency_exceeded"
+      ],
+      "failure_counts": {
+        "missing_direct_rc_link": 0,
+        "missing_rh_es_link": 0,
+        "missing_es_rc_link": 0,
+        "es_capacity_exceeded": 1,
+        "rc_capacity_exceeded": 0,
+        "bandwidth_exceeded": 0,
+        "e2e_latency_exceeded": 1,
+        "crosshaul_latency_exceeded": 1
+      }
+    }
+  ]
+}

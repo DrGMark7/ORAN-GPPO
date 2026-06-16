@@ -1,0 +1,109 @@
+{
+  "paper_mode": true,
+  "benchmark": "paper_small",
+  "timesteps_per_seed": 600000,
+  "time_slots_per_episode": 288,
+  "parallel_envs": 32,
+  "num_seeds": 1,
+  "seeds": [
+    42
+  ],
+  "summary": {
+    "num_seeds": 1,
+    "reward": {
+      "mean": 54.852620790164046,
+      "std": 0.0
+    },
+    "deployment_cost": {
+      "mean": 39.791643749064335,
+      "std": 0.0
+    },
+    "valid_deployment_rate": {
+      "mean": 0.9275167861693578,
+      "std": 0.0
+    },
+    "per_seed": [
+      {
+        "seed": 42,
+        "reward": 54.852620790164046,
+        "cost": 39.791643749064335,
+        "valid_rate": 0.9275167861693578
+      }
+    ],
+    "per_topology": {
+      "paper_small_topology_a": {
+        "reward": {
+          "mean": 67.89393702521835,
+          "std": 0.0
+        },
+        "cost": {
+          "mean": 24.65248528454039,
+          "std": 0.0
+        },
+        "valid_rate": {
+          "mean": 1.0,
+          "std": 0.0
+        }
+      },
+      "paper_small_topology_b": {
+        "reward": {
+          "mean": 70.18819288507271,
+          "std": 0.0
+        },
+        "cost": {
+          "mean": 21.3590643869506,
+          "std": 0.0
+        },
+        "valid_rate": {
+          "mean": 1.0,
+          "std": 0.0
+        }
+      },
+      "paper_small_topology_c": {
+        "reward": {
+          "mean": 67.29145767687275,
+          "std": 0.0
+        },
+        "cost": {
+          "mean": 25.66042908695009,
+          "std": 0.0
+        },
+        "valid_rate": {
+          "mean": 1.0,
+          "std": 0.0
+        }
+      },
+      "paper_small_topology_d": {
+        "reward": {
+          "mean": 66.76301315211157,
+          "std": 0.0
+        },
+        "cost": {
+          "mean": 26.601825243896908,
+          "std": 0.0
+        },
+        "valid_rate": {
+          "mean": 1.0,
+          "std": 0.0
+        }
+      },
+      "paper_small_topology_e": {
+        "reward": {
+          "mean": 70.67537556401341,
+          "std": 0.0
+        },
+        "cost": {
+          "mean": 20.760031302769978,
+          "std": 0.0
+        },
+        "valid_rate": {
+          "mean": 1.0,
+          "std": 0.0
+        }
+      }
+    }
+  },
+  "seed_result_paths": [
+    "/home/hpcnc/intern-research/outputs/paper_runs/training_results_seed_42.json"
+  ]
+}

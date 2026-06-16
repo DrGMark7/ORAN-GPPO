@@ -1,0 +1,120 @@
+============================================================
+Training Complete!
+Final Average Reward: 10.857
+Final Average Cost: 36.969
+Final Valid Deployment Rate: 100.0%
+Final Topologies Seen: ['small_balanced_train_a', 'small_clustered_train_b']
+Training Split Usage: S1=112826, S2=304966, S3=518923, S4=63285
+GNN Verification: saved=True delta_l2=1.446999
+Strict-Feasible Reset Rate: 58.1%
+Exact Strict-Feasible Reset Rate: 58.1%
+Episodes With No Strict-Valid Action: 41.9%
+Invalid Counts By Reason: none
+Invalid Reason Percent Of Time Slots: none
+Average Consecutive-Slot Reconfiguration: split=0.823, es=0.492, rc=0.451, total=1.766
+Reconfiguration Cost Share Of Total Cost: 3.05%
+Timing Profile (s): total=449.623, reset=14.142, graph=9.718, gnn=94.214, action=251.469, env_step=22.951, ppo_update=45.249
+small_balanced_train_a strict link-delay rules out splits: S3
+small_clustered_train_b strict link-delay rules out splits: S3
+============================================================
+
+============================================================
+Evaluation Results (train pool)
+============================================================
+Project Benchmark: small
+Constraint Mode: legacy
+Time Slots Per Episode: 50
+Topologies: ['small_balanced_train_a']
+Structural Validity Rate At Reset: 100.0%
+Strict-Feasible Reset Rate: 0.0%
+Exact Strict-Feasible Rate At Reset: 0.0%
+Episodes With No Strict-Valid Action: 100.0%
+Valid Deployment Rate: 100.0%
+Average Reward: 10.987 ± 0.000
+Average Cost: 35.038 ± 0.000
+Average Consecutive-Slot Reconfiguration: split=0.000, es=0.000, rc=0.000, total=0.000
+Reconfiguration Cost Share Of Total Cost: 0.00%
+small_balanced_train_a | reward=10.987 cost=35.038 valid=100.0% strict_reset=0.0% sla=9.803 | S1=0.0%, S2=37.5%, S3=62.5%, S4=0.0%
+  link-delay rules out strict splits: S3
+============================================================
+
+============================================================
+Evaluation Results (train pool)
+============================================================
+Project Benchmark: small
+Constraint Mode: legacy
+Time Slots Per Episode: 50
+Topologies: ['small_clustered_train_b']
+Structural Validity Rate At Reset: 100.0%
+Strict-Feasible Reset Rate: 0.0%
+Exact Strict-Feasible Rate At Reset: 0.0%
+Episodes With No Strict-Valid Action: 100.0%
+Valid Deployment Rate: 100.0%
+Average Reward: 10.866 ± 0.000
+Average Cost: 37.100 ± 0.000
+Average Consecutive-Slot Reconfiguration: split=0.000, es=0.000, rc=0.000, total=0.000
+Reconfiguration Cost Share Of Total Cost: 0.00%
+small_clustered_train_b | reward=10.866 cost=37.100 valid=100.0% strict_reset=0.0% sla=10.655 | S1=0.0%, S2=25.0%, S3=62.5%, S4=12.5%
+  link-delay rules out strict splits: S3
+============================================================
+
+============================================================
+Evaluation Results (test pool)
+============================================================
+Project Benchmark: small
+Constraint Mode: legacy
+Time Slots Per Episode: 50
+Topologies: ['small_sparse_test_a']
+Structural Validity Rate At Reset: 100.0%
+Strict-Feasible Reset Rate: 0.0%
+Exact Strict-Feasible Rate At Reset: 0.0%
+Episodes With No Strict-Valid Action: 100.0%
+Valid Deployment Rate: 100.0%
+Average Reward: 10.219 ± 0.000
+Average Cost: 48.827 ± 0.000
+Average Consecutive-Slot Reconfiguration: split=0.000, es=0.000, rc=0.000, total=0.000
+Reconfiguration Cost Share Of Total Cost: 0.00%
+small_sparse_test_a | reward=10.219 cost=48.827 valid=100.0% strict_reset=0.0% sla=22.108 | S1=0.0%, S2=37.5%, S3=62.5%, S4=0.0%
+  link-delay rules out strict splits: S2, S3
+============================================================
+
+============================================================
+Evaluation Results (test pool)
+============================================================
+Project Benchmark: small
+Constraint Mode: legacy
+Time Slots Per Episode: 50
+Topologies: ['small_direct_test_b']
+Structural Validity Rate At Reset: 100.0%
+Strict-Feasible Reset Rate: 0.0%
+Exact Strict-Feasible Rate At Reset: 0.0%
+Episodes With No Strict-Valid Action: 100.0%
+Valid Deployment Rate: 100.0%
+Average Reward: 11.005 ± 0.000
+Average Cost: 34.950 ± 0.000
+Average Consecutive-Slot Reconfiguration: split=0.000, es=0.000, rc=0.000, total=0.000
+Reconfiguration Cost Share Of Total Cost: 0.00%
+small_direct_test_b | reward=11.005 cost=34.950 valid=100.0% strict_reset=0.0% sla=9.657 | S1=0.0%, S2=37.5%, S3=62.5%, S4=0.0%
+  link-delay rules out strict splits: S3
+============================================================
+
+============================================================
+Staged Constraint Comparison
+============================================================
+train_pool:
+  small_balanced_train_a | legacy_valid=100.0% strict_valid=0.0% gap=100.0% strict_no_action=100.0% first_fail=strict_full
+  small_clustered_train_b | legacy_valid=100.0% strict_valid=0.0% gap=100.0% strict_no_action=100.0% first_fail=strict_full
+test_pool:
+  small_sparse_test_a | legacy_valid=100.0% strict_valid=0.0% gap=100.0% strict_no_action=100.0% first_fail=strict_full
+  small_direct_test_b | legacy_valid=100.0% strict_valid=0.0% gap=100.0% strict_no_action=100.0% first_fail=strict_full
+
+CSV Exports
+training_episode_metrics: outputs/small_legacy/training_episode_metrics.csv
+evaluation_topology_summary: outputs/small_legacy/evaluation_topology_summary.csv
+invalid_reason_summary: outputs/small_legacy/invalid_reason_summary.csv
+timing_profile: outputs/small_legacy/timing_profile.csv
+episode_trace_csvs:
+  outputs/small_legacy/train_small_balanced_train_a_legacy_episode_000.csv
+  outputs/small_legacy/train_small_clustered_train_b_legacy_episode_000.csv
+  outputs/small_legacy/test_small_sparse_test_a_legacy_episode_000.csv
+  outputs/small_legacy/test_small_direct_test_b_legacy_episode_000.csv

@@ -1,0 +1,2573 @@
+{
+  "config": {
+    "benchmark": "small",
+    "benchmark_label": "project_small",
+    "train_selection_mode": "random_per_reset",
+    "constraint_mode": "legacy",
+    "episode_length_time_slots": 2,
+    "paper_aligned_episode_length": false,
+    "paper_mode": false,
+    "paper_total_timesteps": null,
+    "paper_num_envs": 1,
+    "seed": 42,
+    "dimensions": {
+      "num_rhs": 8,
+      "num_ess": 3,
+      "num_rcs": 2
+    },
+    "gnn_hidden_dim": 64,
+    "gnn_input_dim": 6,
+    "include_node_index": false
+  },
+  "benchmark_audit": {
+    "train": {
+      "small_balanced_train_a": {
+        "topology_id": "small_balanced_train_a",
+        "family": "balanced",
+        "difficulty": "moderate",
+        "crosshaul_latency_limits_ms": [
+          10.0,
+          1.0,
+          0.25,
+          0.25
+        ],
+        "es_rc_delay_range_ms": {
+          "min": 0.954,
+          "max": 1.8839
+        },
+        "direct_rc_delay_range_ms": {
+          "min": 0.1459,
+          "max": 0.1976
+        },
+        "min_feasible_crosshaul_delay_by_split_ms": {
+          "S1": 0.954,
+          "S2": 0.954,
+          "S3": 0.954,
+          "S4": 0.1459
+        },
+        "direct_rh_rc_fraction": 0.25,
+        "split_structurally_available": {
+          "S1": true,
+          "S2": true,
+          "S3": true,
+          "S4": true
+        },
+        "split_latency_feasibility": {
+          "S1": {
+            "mode": "es_rc",
+            "limit_ms": 10.0,
+            "compatible_edge_count": 6,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.954,
+            "max_delay_ms": 1.8839,
+            "strictly_possible_from_link_delay": true
+          },
+          "S2": {
+            "mode": "es_rc",
+            "limit_ms": 1.0,
+            "compatible_edge_count": 1,
+            "compatible_edge_fraction": 0.16666666666666666,
+            "min_delay_ms": 0.954,
+            "max_delay_ms": 1.8839,
+            "strictly_possible_from_link_delay": true
+          },
+          "S3": {
+            "mode": "es_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": 0.954,
+            "max_delay_ms": 1.8839,
+            "strictly_possible_from_link_delay": false
+          },
+          "S4": {
+            "mode": "direct_rh_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 2,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.1459,
+            "max_delay_ms": 0.1976,
+            "strictly_possible_from_link_delay": true
+          }
+        },
+        "splits_ruled_out_by_link_delay": [
+          "S3"
+        ]
+      },
+      "small_clustered_train_b": {
+        "topology_id": "small_clustered_train_b",
+        "family": "clustered",
+        "difficulty": "moderate",
+        "crosshaul_latency_limits_ms": [
+          10.0,
+          1.0,
+          0.25,
+          0.25
+        ],
+        "es_rc_delay_range_ms": {
+          "min": 0.5296,
+          "max": 2.4445
+        },
+        "direct_rc_delay_range_ms": {
+          "min": 0.1251,
+          "max": 0.1852
+        },
+        "min_feasible_crosshaul_delay_by_split_ms": {
+          "S1": 0.5296,
+          "S2": 0.5296,
+          "S3": 0.5296,
+          "S4": 0.1251
+        },
+        "direct_rh_rc_fraction": 0.25,
+        "split_structurally_available": {
+          "S1": true,
+          "S2": true,
+          "S3": true,
+          "S4": true
+        },
+        "split_latency_feasibility": {
+          "S1": {
+            "mode": "es_rc",
+            "limit_ms": 10.0,
+            "compatible_edge_count": 6,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.5296,
+            "max_delay_ms": 2.4445,
+            "strictly_possible_from_link_delay": true
+          },
+          "S2": {
+            "mode": "es_rc",
+            "limit_ms": 1.0,
+            "compatible_edge_count": 2,
+            "compatible_edge_fraction": 0.3333333333333333,
+            "min_delay_ms": 0.5296,
+            "max_delay_ms": 2.4445,
+            "strictly_possible_from_link_delay": true
+          },
+          "S3": {
+            "mode": "es_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": 0.5296,
+            "max_delay_ms": 2.4445,
+            "strictly_possible_from_link_delay": false
+          },
+          "S4": {
+            "mode": "direct_rh_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 2,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.1251,
+            "max_delay_ms": 0.1852,
+            "strictly_possible_from_link_delay": true
+          }
+        },
+        "splits_ruled_out_by_link_delay": [
+          "S3"
+        ]
+      }
+    },
+    "test": {
+      "small_sparse_test_a": {
+        "topology_id": "small_sparse_test_a",
+        "family": "sparse_backhaul",
+        "difficulty": "hard",
+        "crosshaul_latency_limits_ms": [
+          10.0,
+          1.0,
+          0.25,
+          0.25
+        ],
+        "es_rc_delay_range_ms": {
+          "min": 2.0863,
+          "max": 3.1893
+        },
+        "direct_rc_delay_range_ms": {
+          "min": 0.1348,
+          "max": 0.1522
+        },
+        "min_feasible_crosshaul_delay_by_split_ms": {
+          "S1": 2.0863,
+          "S2": 2.0863,
+          "S3": 2.0863,
+          "S4": 0.1348
+        },
+        "direct_rh_rc_fraction": 0.25,
+        "split_structurally_available": {
+          "S1": true,
+          "S2": true,
+          "S3": true,
+          "S4": true
+        },
+        "split_latency_feasibility": {
+          "S1": {
+            "mode": "es_rc",
+            "limit_ms": 10.0,
+            "compatible_edge_count": 6,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 2.0863,
+            "max_delay_ms": 3.1893,
+            "strictly_possible_from_link_delay": true
+          },
+          "S2": {
+            "mode": "es_rc",
+            "limit_ms": 1.0,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": 2.0863,
+            "max_delay_ms": 3.1893,
+            "strictly_possible_from_link_delay": false
+          },
+          "S3": {
+            "mode": "es_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": 2.0863,
+            "max_delay_ms": 3.1893,
+            "strictly_possible_from_link_delay": false
+          },
+          "S4": {
+            "mode": "direct_rh_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 2,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.1348,
+            "max_delay_ms": 0.1522,
+            "strictly_possible_from_link_delay": true
+          }
+        },
+        "splits_ruled_out_by_link_delay": [
+          "S2",
+          "S3"
+        ]
+      },
+      "small_direct_test_b": {
+        "topology_id": "small_direct_test_b",
+        "family": "direct_heavy",
+        "difficulty": "hard",
+        "crosshaul_latency_limits_ms": [
+          10.0,
+          1.0,
+          0.25,
+          0.25
+        ],
+        "es_rc_delay_range_ms": {
+          "min": 0.7381,
+          "max": 2.5017
+        },
+        "direct_rc_delay_range_ms": {
+          "min": 0.1211,
+          "max": 0.144
+        },
+        "min_feasible_crosshaul_delay_by_split_ms": {
+          "S1": 0.7381,
+          "S2": 0.7381,
+          "S3": 0.7381,
+          "S4": 0.1211
+        },
+        "direct_rh_rc_fraction": 0.25,
+        "split_structurally_available": {
+          "S1": true,
+          "S2": true,
+          "S3": true,
+          "S4": true
+        },
+        "split_latency_feasibility": {
+          "S1": {
+            "mode": "es_rc",
+            "limit_ms": 10.0,
+            "compatible_edge_count": 6,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.7381,
+            "max_delay_ms": 2.5017,
+            "strictly_possible_from_link_delay": true
+          },
+          "S2": {
+            "mode": "es_rc",
+            "limit_ms": 1.0,
+            "compatible_edge_count": 2,
+            "compatible_edge_fraction": 0.3333333333333333,
+            "min_delay_ms": 0.7381,
+            "max_delay_ms": 2.5017,
+            "strictly_possible_from_link_delay": true
+          },
+          "S3": {
+            "mode": "es_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": 0.7381,
+            "max_delay_ms": 2.5017,
+            "strictly_possible_from_link_delay": false
+          },
+          "S4": {
+            "mode": "direct_rh_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 2,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.1211,
+            "max_delay_ms": 0.144,
+            "strictly_possible_from_link_delay": true
+          }
+        },
+        "splits_ruled_out_by_link_delay": [
+          "S3"
+        ]
+      }
+    }
+  },
+  "episode_rewards": [
+    0.40932000759859966
+  ],
+  "episode_costs": [
+    49.642967224121094
+  ],
+  "valid_deployments": [
+    1.0
+  ],
+  "episode_valid_time_slot_rates": [
+    1.0
+  ],
+  "episode_topology_ids": [
+    "small_balanced_train_a"
+  ],
+  "episode_topology_pools": [
+    "train"
+  ],
+  "episode_has_structurally_valid_action": [
+    true
+  ],
+  "episode_has_strictly_valid_action": [
+    true
+  ],
+  "episode_has_greedy_strictly_valid_action": [
+    false
+  ],
+  "episode_has_exact_strictly_valid_action": [
+    true
+  ],
+  "episode_bounded_strict_feasibility_probe": [
+    {
+      "result": true,
+      "rhs_considered": 8,
+      "visit_limit": 50000,
+      "is_full_instance": true,
+      "is_exact": true,
+      "status": "exact"
+    }
+  ],
+  "episode_failure_counts": [
+    {
+      "missing_direct_rc_link": 0,
+      "missing_rh_es_link": 0,
+      "missing_es_rc_link": 0,
+      "es_capacity_exceeded": 0,
+      "rc_capacity_exceeded": 0,
+      "bandwidth_exceeded": 0,
+      "e2e_latency_exceeded": 0,
+      "crosshaul_latency_exceeded": 0
+    }
+  ],
+  "episode_cost_breakdowns": [
+    {
+      "processing_cost": 78.41921615600586,
+      "routing_cost": 2.679816545967758,
+      "reconfiguration_cost": 8.0,
+      "sla_penalty": 10.186901092529297,
+      "es_overuse": 2.1942195892333984,
+      "rc_overuse": 0.0,
+      "bandwidth_overuse": 0.0,
+      "e2e_violation": 0.7587812019348146,
+      "crosshaul_violation": 7.23390007019043
+    }
+  ],
+  "episode_reconfiguration_stats": [
+    {
+      "split_changes": 4.0,
+      "es_changes": 4.0,
+      "rc_changes": 0.0,
+      "total_reconfiguration_changes": 8.0,
+      "time_slot_count": 2,
+      "time_slot_transitions": 1,
+      "avg_split_changes_per_transition": 4.0,
+      "avg_es_changes_per_transition": 4.0,
+      "avg_rc_changes_per_transition": 0.0,
+      "avg_total_reconfiguration_changes_per_transition": 8.0,
+      "reconfiguration_cost_pct_of_total_cost": 7.30774901841975
+    }
+  ],
+  "episode_split_usage": [
+    {
+      "S1": 6,
+      "S2": 6,
+      "S3": 4,
+      "S4": 0
+    }
+  ],
+  "training_summary": {
+    "timing_profile_seconds": {
+      "total_seconds": 0.055768666963558644,
+      "reset_seconds": 0.0026062820106744766,
+      "adjacency_seconds": 8.05780291557312e-05,
+      "graph_build_seconds": 0.00031015602871775627,
+      "gnn_forward_seconds": 0.0018841649871319532,
+      "action_selection_seconds": 0.012149167014285922,
+      "env_step_seconds": 0.0005527409957721829,
+      "store_transition_seconds": 6.468198262155056e-05,
+      "ppo_update_seconds": 0.01570715504931286,
+      "results_write_seconds": 0.0006441010045818985,
+      "checkpoint_save_seconds": 0.0020231770467944443,
+      "evaluation_seconds": 0.2275711849797517,
+      "comparison_seconds": 0.9199782439973205,
+      "evaluation_train_pool_seconds": 0.10065411095274612,
+      "evaluation_test_pool_seconds": 0.12691707402700558
+    },
+    "split_usage": {
+      "S1": 6,
+      "S2": 6,
+      "S3": 4,
+      "S4": 0
+    },
+    "avg_cost_breakdown_per_episode": {
+      "processing_cost": 78.41921615600586,
+      "routing_cost": 2.679816545967758,
+      "reconfiguration_cost": 8.0,
+      "sla_penalty": 10.186901092529297,
+      "es_overuse": 2.1942195892333984,
+      "rc_overuse": 0.0,
+      "bandwidth_overuse": 0.0,
+      "e2e_violation": 0.7587812019348146,
+      "crosshaul_violation": 7.23390007019043
+    },
+    "avg_reconfiguration_stats_per_episode": {
+      "split_changes": 4.0,
+      "es_changes": 4.0,
+      "rc_changes": 0.0,
+      "total_reconfiguration_changes": 8.0,
+      "avg_split_changes_per_transition": 4.0,
+      "avg_es_changes_per_transition": 4.0,
+      "avg_rc_changes_per_transition": 0.0,
+      "avg_total_reconfiguration_changes_per_transition": 8.0,
+      "reconfiguration_cost_pct_of_total_cost": 7.30774901841975
+    },
+    "invalid_counts_by_reason": {
+      "missing_direct_rc_link": 0,
+      "missing_rh_es_link": 0,
+      "missing_es_rc_link": 0,
+      "es_capacity_exceeded": 0,
+      "rc_capacity_exceeded": 0,
+      "bandwidth_exceeded": 0,
+      "e2e_latency_exceeded": 0,
+      "crosshaul_latency_exceeded": 0
+    },
+    "strict_feasible_reset_rate": 1.0,
+    "exact_strict_feasible_reset_rate": 1.0,
+    "strict_feasibility_reporting": {
+      "rate_label": "Strict-Feasible Reset Rate",
+      "no_action_label": "Episodes With No Strict-Valid Action",
+      "status": "exact_supported"
+    },
+    "bounded_strict_probe_summary": {
+      "positive_rate": 1.0,
+      "negative_rate": 0.0,
+      "inconclusive_rate": 0.0
+    },
+    "episodes_with_no_strict_valid_action_rate": 0.0,
+    "invalid_reason_percentages": {
+      "missing_direct_rc_link": 0.0,
+      "missing_rh_es_link": 0.0,
+      "missing_es_rc_link": 0.0,
+      "es_capacity_exceeded": 0.0,
+      "rc_capacity_exceeded": 0.0,
+      "bandwidth_exceeded": 0.0,
+      "e2e_latency_exceeded": 0.0,
+      "crosshaul_latency_exceeded": 0.0
+    }
+  },
+  "strict_mode_debug": {
+    "first_failure_traces": [],
+    "per_topology": {
+      "small_balanced_train_a": {
+        "strict_feasible_reset_rate": 1.0,
+        "exact_strict_feasible_reset_count": 1,
+        "valid_time_slot_rate": 1.0,
+        "avg_invalid_reasons_per_time_slot": 0.0,
+        "invalid_counts_by_reason": {
+          "missing_direct_rc_link": 0,
+          "missing_rh_es_link": 0,
+          "missing_es_rc_link": 0,
+          "es_capacity_exceeded": 0,
+          "rc_capacity_exceeded": 0,
+          "bandwidth_exceeded": 0,
+          "e2e_latency_exceeded": 0,
+          "crosshaul_latency_exceeded": 0
+        },
+        "invalid_reason_percentages": {
+          "missing_direct_rc_link": 0.0,
+          "missing_rh_es_link": 0.0,
+          "missing_es_rc_link": 0.0,
+          "es_capacity_exceeded": 0.0,
+          "rc_capacity_exceeded": 0.0,
+          "bandwidth_exceeded": 0.0,
+          "e2e_latency_exceeded": 0.0,
+          "crosshaul_latency_exceeded": 0.0
+        },
+        "first_failing_constraint_counts": {},
+        "bounded_probe_results": [
+          {
+            "result": true,
+            "rhs_considered": 8,
+            "visit_limit": 50000,
+            "is_full_instance": true,
+            "is_exact": true,
+            "status": "exact"
+          }
+        ],
+        "bounded_probe_summary": {
+          "positive_rate": 1.0,
+          "negative_rate": 0.0,
+          "inconclusive_rate": 0.0
+        }
+      }
+    },
+    "topology_latency_diagnostics": {
+      "small_balanced_train_a": {
+        "topology_id": "small_balanced_train_a",
+        "family": "balanced",
+        "difficulty": "moderate",
+        "crosshaul_latency_limits_ms": [
+          10.0,
+          1.0,
+          0.25,
+          0.25
+        ],
+        "es_rc_delay_range_ms": {
+          "min": 0.954,
+          "max": 1.8839
+        },
+        "direct_rc_delay_range_ms": {
+          "min": 0.1459,
+          "max": 0.1976
+        },
+        "min_feasible_crosshaul_delay_by_split_ms": {
+          "S1": 0.954,
+          "S2": 0.954,
+          "S3": 0.954,
+          "S4": 0.1459
+        },
+        "direct_rh_rc_fraction": 0.25,
+        "split_structurally_available": {
+          "S1": true,
+          "S2": true,
+          "S3": true,
+          "S4": true
+        },
+        "split_latency_feasibility": {
+          "S1": {
+            "mode": "es_rc",
+            "limit_ms": 10.0,
+            "compatible_edge_count": 6,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.954,
+            "max_delay_ms": 1.8839,
+            "strictly_possible_from_link_delay": true
+          },
+          "S2": {
+            "mode": "es_rc",
+            "limit_ms": 1.0,
+            "compatible_edge_count": 1,
+            "compatible_edge_fraction": 0.16666666666666666,
+            "min_delay_ms": 0.954,
+            "max_delay_ms": 1.8839,
+            "strictly_possible_from_link_delay": true
+          },
+          "S3": {
+            "mode": "es_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": 0.954,
+            "max_delay_ms": 1.8839,
+            "strictly_possible_from_link_delay": false
+          },
+          "S4": {
+            "mode": "direct_rh_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 2,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.1459,
+            "max_delay_ms": 0.1976,
+            "strictly_possible_from_link_delay": true
+          }
+        },
+        "splits_ruled_out_by_link_delay": [
+          "S3"
+        ]
+      }
+    }
+  },
+  "gnn_training_verification": {
+    "gnn_state_dict_saved": true,
+    "initial_param_l2_norm": 20.432986936490455,
+    "final_param_l2_norm": 20.43314614301771,
+    "parameter_delta_l2_norm": 0.027050176156063196
+  },
+  "evaluation": {
+    "train_pool": {
+      "small_balanced_train_a": {
+        "benchmark": "small",
+        "topology_pool_name": "train",
+        "selection_mode": "fixed",
+        "constraint_mode": "legacy",
+        "episode_length_time_slots": 2,
+        "topology_ids": [
+          "small_balanced_train_a"
+        ],
+        "has_structurally_valid_action": [
+          true
+        ],
+        "has_strictly_valid_action": [
+          false
+        ],
+        "has_greedy_strictly_valid_action": [
+          false
+        ],
+        "has_exact_strictly_valid_action": [
+          false
+        ],
+        "bounded_strict_feasibility_probe": [
+          {
+            "result": false,
+            "rhs_considered": 8,
+            "visit_limit": 50000,
+            "is_full_instance": true,
+            "is_exact": true,
+            "status": "exact"
+          }
+        ],
+        "episode_trace_paths": [
+          "outputs/path_eval_smoke/episode_traces/train_small_balanced_train_a_legacy_episode_000.json"
+        ],
+        "episode_trace_csv_paths": [
+          "outputs/path_eval_smoke/train_small_balanced_train_a_legacy_episode_000.csv"
+        ],
+        "avg_reward": 0.3739643638092214,
+        "std_reward": 0.0,
+        "avg_cost": 76.81243515014648,
+        "std_cost": 0.0,
+        "valid_rate": 1.0,
+        "strict_feasible_reset_rate": 0.0,
+        "exact_strict_feasible_reset_rate": 0.0,
+        "strict_feasibility_reporting": {
+          "rate_label": "Strict-Feasible Reset Rate",
+          "no_action_label": "Episodes With No Strict-Valid Action",
+          "status": "exact_supported"
+        },
+        "bounded_strict_probe_summary": {
+          "positive_rate": 0.0,
+          "negative_rate": 1.0,
+          "inconclusive_rate": 0.0
+        },
+        "invalid_counts_by_reason": {
+          "missing_direct_rc_link": 0,
+          "missing_rh_es_link": 0,
+          "missing_es_rc_link": 0,
+          "es_capacity_exceeded": 0,
+          "rc_capacity_exceeded": 0,
+          "bandwidth_exceeded": 0,
+          "e2e_latency_exceeded": 0,
+          "crosshaul_latency_exceeded": 0
+        },
+        "invalid_reason_percentages": {
+          "missing_direct_rc_link": 0.0,
+          "missing_rh_es_link": 0.0,
+          "missing_es_rc_link": 0.0,
+          "es_capacity_exceeded": 0.0,
+          "rc_capacity_exceeded": 0.0,
+          "bandwidth_exceeded": 0.0,
+          "e2e_latency_exceeded": 0.0,
+          "crosshaul_latency_exceeded": 0.0
+        },
+        "avg_reconfiguration_stats_per_episode": {
+          "split_changes": 0.0,
+          "es_changes": 0.0,
+          "rc_changes": 0.0,
+          "total_reconfiguration_changes": 0.0,
+          "avg_split_changes_per_transition": 0.0,
+          "avg_es_changes_per_transition": 0.0,
+          "avg_rc_changes_per_transition": 0.0,
+          "avg_total_reconfiguration_changes_per_transition": 0.0,
+          "reconfiguration_cost_pct_of_total_cost": 0.0
+        },
+        "first_failing_constraint_counts": {},
+        "episodes_with_no_strict_valid_action_rate": 1.0,
+        "latency_diagnostics": {
+          "topology_id": "small_balanced_train_a",
+          "family": "balanced",
+          "difficulty": "moderate",
+          "crosshaul_latency_limits_ms": [
+            10.0,
+            1.0,
+            0.25,
+            0.25
+          ],
+          "es_rc_delay_range_ms": {
+            "min": 0.954,
+            "max": 1.8839
+          },
+          "direct_rc_delay_range_ms": {
+            "min": 0.1459,
+            "max": 0.1976
+          },
+          "min_feasible_crosshaul_delay_by_split_ms": {
+            "S1": 0.954,
+            "S2": 0.954,
+            "S3": 0.954,
+            "S4": 0.1459
+          },
+          "direct_rh_rc_fraction": 0.25,
+          "split_structurally_available": {
+            "S1": true,
+            "S2": true,
+            "S3": true,
+            "S4": true
+          },
+          "split_latency_feasibility": {
+            "S1": {
+              "mode": "es_rc",
+              "limit_ms": 10.0,
+              "compatible_edge_count": 6,
+              "compatible_edge_fraction": 1.0,
+              "min_delay_ms": 0.954,
+              "max_delay_ms": 1.8839,
+              "strictly_possible_from_link_delay": true
+            },
+            "S2": {
+              "mode": "es_rc",
+              "limit_ms": 1.0,
+              "compatible_edge_count": 1,
+              "compatible_edge_fraction": 0.16666666666666666,
+              "min_delay_ms": 0.954,
+              "max_delay_ms": 1.8839,
+              "strictly_possible_from_link_delay": true
+            },
+            "S3": {
+              "mode": "es_rc",
+              "limit_ms": 0.25,
+              "compatible_edge_count": 0,
+              "compatible_edge_fraction": 0.0,
+              "min_delay_ms": 0.954,
+              "max_delay_ms": 1.8839,
+              "strictly_possible_from_link_delay": false
+            },
+            "S4": {
+              "mode": "direct_rh_rc",
+              "limit_ms": 0.25,
+              "compatible_edge_count": 2,
+              "compatible_edge_fraction": 1.0,
+              "min_delay_ms": 0.1459,
+              "max_delay_ms": 0.1976,
+              "strictly_possible_from_link_delay": true
+            }
+          },
+          "splits_ruled_out_by_link_delay": [
+            "S3"
+          ]
+        },
+        "per_topology": {
+          "small_balanced_train_a": {
+            "mean_reward": 0.3739643638092214,
+            "std_reward": 0.0,
+            "mean_cost": 76.81243515014648,
+            "std_cost": 0.0,
+            "validity_rate": 1.0,
+            "structural_validity_rate_at_reset": 1.0,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_count": 0,
+            "avg_invalid_reasons_per_time_slot": 0.0,
+            "sla_penalty": 14.436263084411621,
+            "invalid_counts_by_reason": {
+              "missing_direct_rc_link": 0,
+              "missing_rh_es_link": 0,
+              "missing_es_rc_link": 0,
+              "es_capacity_exceeded": 0,
+              "rc_capacity_exceeded": 0,
+              "bandwidth_exceeded": 0,
+              "e2e_latency_exceeded": 0,
+              "crosshaul_latency_exceeded": 0
+            },
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 0.0,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 0.0,
+              "crosshaul_latency_exceeded": 0.0
+            },
+            "first_failing_constraint_counts": {},
+            "bounded_probe_results": [
+              {
+                "result": false,
+                "rhs_considered": 8,
+                "visit_limit": 50000,
+                "is_full_instance": true,
+                "is_exact": true,
+                "status": "exact"
+              }
+            ],
+            "bounded_probe_summary": {
+              "positive_rate": 0.0,
+              "negative_rate": 1.0,
+              "inconclusive_rate": 0.0
+            },
+            "split_distribution": {
+              "S1": 0.375,
+              "S2": 0.5,
+              "S3": 0.125,
+              "S4": 0.0
+            },
+            "cost_breakdown": {
+              "processing_cost": 60.190141677856445,
+              "routing_cost": 2.18602804309912,
+              "reconfiguration_cost": 0.0,
+              "sla_penalty": 14.436263084411621,
+              "es_overuse": 10.543828964233398,
+              "rc_overuse": 0.0,
+              "bandwidth_overuse": 0.0,
+              "e2e_violation": 0.5378342538833616,
+              "crosshaul_violation": 3.354599952697754
+            },
+            "reconfiguration_stats": {
+              "split_changes": 0.0,
+              "es_changes": 0.0,
+              "rc_changes": 0.0,
+              "total_reconfiguration_changes": 0.0,
+              "avg_split_changes_per_transition": 0.0,
+              "avg_es_changes_per_transition": 0.0,
+              "avg_rc_changes_per_transition": 0.0,
+              "avg_total_reconfiguration_changes_per_transition": 0.0,
+              "reconfiguration_cost_pct_of_total_cost": 0.0
+            },
+            "topology_metadata": {
+              "generator_seed": 101,
+              "edge_count": 24,
+              "family": "balanced",
+              "difficulty": "moderate",
+              "description": "Balanced project benchmark topology with moderate redundancy.",
+              "benchmark_label": "project_small",
+              "paper_aligned": false,
+              "paper_aligned_large": false,
+              "direct_rc_probability": null
+            },
+            "latency_diagnostics": {
+              "topology_id": "small_balanced_train_a",
+              "family": "balanced",
+              "difficulty": "moderate",
+              "crosshaul_latency_limits_ms": [
+                10.0,
+                1.0,
+                0.25,
+                0.25
+              ],
+              "es_rc_delay_range_ms": {
+                "min": 0.954,
+                "max": 1.8839
+              },
+              "direct_rc_delay_range_ms": {
+                "min": 0.1459,
+                "max": 0.1976
+              },
+              "min_feasible_crosshaul_delay_by_split_ms": {
+                "S1": 0.954,
+                "S2": 0.954,
+                "S3": 0.954,
+                "S4": 0.1459
+              },
+              "direct_rh_rc_fraction": 0.25,
+              "split_structurally_available": {
+                "S1": true,
+                "S2": true,
+                "S3": true,
+                "S4": true
+              },
+              "split_latency_feasibility": {
+                "S1": {
+                  "mode": "es_rc",
+                  "limit_ms": 10.0,
+                  "compatible_edge_count": 6,
+                  "compatible_edge_fraction": 1.0,
+                  "min_delay_ms": 0.954,
+                  "max_delay_ms": 1.8839,
+                  "strictly_possible_from_link_delay": true
+                },
+                "S2": {
+                  "mode": "es_rc",
+                  "limit_ms": 1.0,
+                  "compatible_edge_count": 1,
+                  "compatible_edge_fraction": 0.16666666666666666,
+                  "min_delay_ms": 0.954,
+                  "max_delay_ms": 1.8839,
+                  "strictly_possible_from_link_delay": true
+                },
+                "S3": {
+                  "mode": "es_rc",
+                  "limit_ms": 0.25,
+                  "compatible_edge_count": 0,
+                  "compatible_edge_fraction": 0.0,
+                  "min_delay_ms": 0.954,
+                  "max_delay_ms": 1.8839,
+                  "strictly_possible_from_link_delay": false
+                },
+                "S4": {
+                  "mode": "direct_rh_rc",
+                  "limit_ms": 0.25,
+                  "compatible_edge_count": 2,
+                  "compatible_edge_fraction": 1.0,
+                  "min_delay_ms": 0.1459,
+                  "max_delay_ms": 0.1976,
+                  "strictly_possible_from_link_delay": true
+                }
+              },
+              "splits_ruled_out_by_link_delay": [
+                "S3"
+              ]
+            }
+          }
+        }
+      },
+      "small_clustered_train_b": {
+        "benchmark": "small",
+        "topology_pool_name": "train",
+        "selection_mode": "fixed",
+        "constraint_mode": "legacy",
+        "episode_length_time_slots": 2,
+        "topology_ids": [
+          "small_clustered_train_b"
+        ],
+        "has_structurally_valid_action": [
+          true
+        ],
+        "has_strictly_valid_action": [
+          false
+        ],
+        "has_greedy_strictly_valid_action": [
+          false
+        ],
+        "has_exact_strictly_valid_action": [
+          false
+        ],
+        "bounded_strict_feasibility_probe": [
+          {
+            "result": false,
+            "rhs_considered": 8,
+            "visit_limit": 50000,
+            "is_full_instance": true,
+            "is_exact": true,
+            "status": "exact"
+          }
+        ],
+        "episode_trace_paths": [
+          "outputs/path_eval_smoke/episode_traces/train_small_clustered_train_b_legacy_episode_000.json"
+        ],
+        "episode_trace_csv_paths": [
+          "outputs/path_eval_smoke/train_small_clustered_train_b_legacy_episode_000.csv"
+        ],
+        "avg_reward": 0.3832402019208139,
+        "std_reward": 0.0,
+        "avg_cost": 67.69222640991211,
+        "std_cost": 0.0,
+        "valid_rate": 1.0,
+        "strict_feasible_reset_rate": 0.0,
+        "exact_strict_feasible_reset_rate": 0.0,
+        "strict_feasibility_reporting": {
+          "rate_label": "Strict-Feasible Reset Rate",
+          "no_action_label": "Episodes With No Strict-Valid Action",
+          "status": "exact_supported"
+        },
+        "bounded_strict_probe_summary": {
+          "positive_rate": 0.0,
+          "negative_rate": 1.0,
+          "inconclusive_rate": 0.0
+        },
+        "invalid_counts_by_reason": {
+          "missing_direct_rc_link": 0,
+          "missing_rh_es_link": 0,
+          "missing_es_rc_link": 0,
+          "es_capacity_exceeded": 0,
+          "rc_capacity_exceeded": 0,
+          "bandwidth_exceeded": 0,
+          "e2e_latency_exceeded": 0,
+          "crosshaul_latency_exceeded": 0
+        },
+        "invalid_reason_percentages": {
+          "missing_direct_rc_link": 0.0,
+          "missing_rh_es_link": 0.0,
+          "missing_es_rc_link": 0.0,
+          "es_capacity_exceeded": 0.0,
+          "rc_capacity_exceeded": 0.0,
+          "bandwidth_exceeded": 0.0,
+          "e2e_latency_exceeded": 0.0,
+          "crosshaul_latency_exceeded": 0.0
+        },
+        "avg_reconfiguration_stats_per_episode": {
+          "split_changes": 0.0,
+          "es_changes": 0.0,
+          "rc_changes": 0.0,
+          "total_reconfiguration_changes": 0.0,
+          "avg_split_changes_per_transition": 0.0,
+          "avg_es_changes_per_transition": 0.0,
+          "avg_rc_changes_per_transition": 0.0,
+          "avg_total_reconfiguration_changes_per_transition": 0.0,
+          "reconfiguration_cost_pct_of_total_cost": 0.0
+        },
+        "first_failing_constraint_counts": {},
+        "episodes_with_no_strict_valid_action_rate": 1.0,
+        "latency_diagnostics": {
+          "topology_id": "small_clustered_train_b",
+          "family": "clustered",
+          "difficulty": "moderate",
+          "crosshaul_latency_limits_ms": [
+            10.0,
+            1.0,
+            0.25,
+            0.25
+          ],
+          "es_rc_delay_range_ms": {
+            "min": 0.5296,
+            "max": 2.4445
+          },
+          "direct_rc_delay_range_ms": {
+            "min": 0.1251,
+            "max": 0.1852
+          },
+          "min_feasible_crosshaul_delay_by_split_ms": {
+            "S1": 0.5296,
+            "S2": 0.5296,
+            "S3": 0.5296,
+            "S4": 0.1251
+          },
+          "direct_rh_rc_fraction": 0.25,
+          "split_structurally_available": {
+            "S1": true,
+            "S2": true,
+            "S3": true,
+            "S4": true
+          },
+          "split_latency_feasibility": {
+            "S1": {
+              "mode": "es_rc",
+              "limit_ms": 10.0,
+              "compatible_edge_count": 6,
+              "compatible_edge_fraction": 1.0,
+              "min_delay_ms": 0.5296,
+              "max_delay_ms": 2.4445,
+              "strictly_possible_from_link_delay": true
+            },
+            "S2": {
+              "mode": "es_rc",
+              "limit_ms": 1.0,
+              "compatible_edge_count": 2,
+              "compatible_edge_fraction": 0.3333333333333333,
+              "min_delay_ms": 0.5296,
+              "max_delay_ms": 2.4445,
+              "strictly_possible_from_link_delay": true
+            },
+            "S3": {
+              "mode": "es_rc",
+              "limit_ms": 0.25,
+              "compatible_edge_count": 0,
+              "compatible_edge_fraction": 0.0,
+              "min_delay_ms": 0.5296,
+              "max_delay_ms": 2.4445,
+              "strictly_possible_from_link_delay": false
+            },
+            "S4": {
+              "mode": "direct_rh_rc",
+              "limit_ms": 0.25,
+              "compatible_edge_count": 2,
+              "compatible_edge_fraction": 1.0,
+              "min_delay_ms": 0.1251,
+              "max_delay_ms": 0.1852,
+              "strictly_possible_from_link_delay": true
+            }
+          },
+          "splits_ruled_out_by_link_delay": [
+            "S3"
+          ]
+        },
+        "per_topology": {
+          "small_clustered_train_b": {
+            "mean_reward": 0.3832402019208139,
+            "std_reward": 0.0,
+            "mean_cost": 67.69222640991211,
+            "std_cost": 0.0,
+            "validity_rate": 1.0,
+            "structural_validity_rate_at_reset": 1.0,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_count": 0,
+            "avg_invalid_reasons_per_time_slot": 0.0,
+            "sla_penalty": 5.7626097202301025,
+            "invalid_counts_by_reason": {
+              "missing_direct_rc_link": 0,
+              "missing_rh_es_link": 0,
+              "missing_es_rc_link": 0,
+              "es_capacity_exceeded": 0,
+              "rc_capacity_exceeded": 0,
+              "bandwidth_exceeded": 0,
+              "e2e_latency_exceeded": 0,
+              "crosshaul_latency_exceeded": 0
+            },
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 0.0,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 0.0,
+              "crosshaul_latency_exceeded": 0.0
+            },
+            "first_failing_constraint_counts": {},
+            "bounded_probe_results": [
+              {
+                "result": false,
+                "rhs_considered": 8,
+                "visit_limit": 50000,
+                "is_full_instance": true,
+                "is_exact": true,
+                "status": "exact"
+              }
+            ],
+            "bounded_probe_summary": {
+              "positive_rate": 0.0,
+              "negative_rate": 1.0,
+              "inconclusive_rate": 0.0
+            },
+            "split_distribution": {
+              "S1": 0.25,
+              "S2": 0.5,
+              "S3": 0.125,
+              "S4": 0.125
+            },
+            "cost_breakdown": {
+              "processing_cost": 60.190141677856445,
+              "routing_cost": 1.7394756360273809,
+              "reconfiguration_cost": 0.0,
+              "sla_penalty": 5.7626097202301025,
+              "es_overuse": 1.4656257629394531,
+              "rc_overuse": 0.0,
+              "bandwidth_overuse": 0.0,
+              "e2e_violation": 1.035184253883362,
+              "crosshaul_violation": 3.2617998123168945
+            },
+            "reconfiguration_stats": {
+              "split_changes": 0.0,
+              "es_changes": 0.0,
+              "rc_changes": 0.0,
+              "total_reconfiguration_changes": 0.0,
+              "avg_split_changes_per_transition": 0.0,
+              "avg_es_changes_per_transition": 0.0,
+              "avg_rc_changes_per_transition": 0.0,
+              "avg_total_reconfiguration_changes_per_transition": 0.0,
+              "reconfiguration_cost_pct_of_total_cost": 0.0
+            },
+            "topology_metadata": {
+              "generator_seed": 202,
+              "edge_count": 24,
+              "family": "clustered",
+              "difficulty": "moderate",
+              "description": "Clustered family with repeated RH-to-ES attachment patterns and shared bottlenecks.",
+              "benchmark_label": "project_small",
+              "paper_aligned": false,
+              "paper_aligned_large": false,
+              "direct_rc_probability": null
+            },
+            "latency_diagnostics": {
+              "topology_id": "small_clustered_train_b",
+              "family": "clustered",
+              "difficulty": "moderate",
+              "crosshaul_latency_limits_ms": [
+                10.0,
+                1.0,
+                0.25,
+                0.25
+              ],
+              "es_rc_delay_range_ms": {
+                "min": 0.5296,
+                "max": 2.4445
+              },
+              "direct_rc_delay_range_ms": {
+                "min": 0.1251,
+                "max": 0.1852
+              },
+              "min_feasible_crosshaul_delay_by_split_ms": {
+                "S1": 0.5296,
+                "S2": 0.5296,
+                "S3": 0.5296,
+                "S4": 0.1251
+              },
+              "direct_rh_rc_fraction": 0.25,
+              "split_structurally_available": {
+                "S1": true,
+                "S2": true,
+                "S3": true,
+                "S4": true
+              },
+              "split_latency_feasibility": {
+                "S1": {
+                  "mode": "es_rc",
+                  "limit_ms": 10.0,
+                  "compatible_edge_count": 6,
+                  "compatible_edge_fraction": 1.0,
+                  "min_delay_ms": 0.5296,
+                  "max_delay_ms": 2.4445,
+                  "strictly_possible_from_link_delay": true
+                },
+                "S2": {
+                  "mode": "es_rc",
+                  "limit_ms": 1.0,
+                  "compatible_edge_count": 2,
+                  "compatible_edge_fraction": 0.3333333333333333,
+                  "min_delay_ms": 0.5296,
+                  "max_delay_ms": 2.4445,
+                  "strictly_possible_from_link_delay": true
+                },
+                "S3": {
+                  "mode": "es_rc",
+                  "limit_ms": 0.25,
+                  "compatible_edge_count": 0,
+                  "compatible_edge_fraction": 0.0,
+                  "min_delay_ms": 0.5296,
+                  "max_delay_ms": 2.4445,
+                  "strictly_possible_from_link_delay": false
+                },
+                "S4": {
+                  "mode": "direct_rh_rc",
+                  "limit_ms": 0.25,
+                  "compatible_edge_count": 2,
+                  "compatible_edge_fraction": 1.0,
+                  "min_delay_ms": 0.1251,
+                  "max_delay_ms": 0.1852,
+                  "strictly_possible_from_link_delay": true
+                }
+              },
+              "splits_ruled_out_by_link_delay": [
+                "S3"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "test_pool": {
+      "small_sparse_test_a": {
+        "benchmark": "small",
+        "topology_pool_name": "test",
+        "selection_mode": "fixed",
+        "constraint_mode": "legacy",
+        "episode_length_time_slots": 2,
+        "topology_ids": [
+          "small_sparse_test_a"
+        ],
+        "has_structurally_valid_action": [
+          true
+        ],
+        "has_strictly_valid_action": [
+          false
+        ],
+        "has_greedy_strictly_valid_action": [
+          false
+        ],
+        "has_exact_strictly_valid_action": [
+          false
+        ],
+        "bounded_strict_feasibility_probe": [
+          {
+            "result": false,
+            "rhs_considered": 8,
+            "visit_limit": 50000,
+            "is_full_instance": true,
+            "is_exact": true,
+            "status": "exact"
+          }
+        ],
+        "episode_trace_paths": [
+          "outputs/path_eval_smoke/episode_traces/test_small_sparse_test_a_legacy_episode_000.json"
+        ],
+        "episode_trace_csv_paths": [
+          "outputs/path_eval_smoke/test_small_sparse_test_a_legacy_episode_000.csv"
+        ],
+        "avg_reward": 0.36178907965230633,
+        "std_reward": 0.0,
+        "avg_cost": 93.44942855834961,
+        "std_cost": 0.0,
+        "valid_rate": 1.0,
+        "strict_feasible_reset_rate": 0.0,
+        "exact_strict_feasible_reset_rate": 0.0,
+        "strict_feasibility_reporting": {
+          "rate_label": "Strict-Feasible Reset Rate",
+          "no_action_label": "Episodes With No Strict-Valid Action",
+          "status": "exact_supported"
+        },
+        "bounded_strict_probe_summary": {
+          "positive_rate": 0.0,
+          "negative_rate": 1.0,
+          "inconclusive_rate": 0.0
+        },
+        "invalid_counts_by_reason": {
+          "missing_direct_rc_link": 0,
+          "missing_rh_es_link": 0,
+          "missing_es_rc_link": 0,
+          "es_capacity_exceeded": 0,
+          "rc_capacity_exceeded": 0,
+          "bandwidth_exceeded": 0,
+          "e2e_latency_exceeded": 0,
+          "crosshaul_latency_exceeded": 0
+        },
+        "invalid_reason_percentages": {
+          "missing_direct_rc_link": 0.0,
+          "missing_rh_es_link": 0.0,
+          "missing_es_rc_link": 0.0,
+          "es_capacity_exceeded": 0.0,
+          "rc_capacity_exceeded": 0.0,
+          "bandwidth_exceeded": 0.0,
+          "e2e_latency_exceeded": 0.0,
+          "crosshaul_latency_exceeded": 0.0
+        },
+        "avg_reconfiguration_stats_per_episode": {
+          "split_changes": 0.0,
+          "es_changes": 2.0,
+          "rc_changes": 0.0,
+          "total_reconfiguration_changes": 2.0,
+          "avg_split_changes_per_transition": 0.0,
+          "avg_es_changes_per_transition": 2.0,
+          "avg_rc_changes_per_transition": 0.0,
+          "avg_total_reconfiguration_changes_per_transition": 2.0,
+          "reconfiguration_cost_pct_of_total_cost": 0.8216034851250023
+        },
+        "first_failing_constraint_counts": {},
+        "episodes_with_no_strict_valid_action_rate": 1.0,
+        "latency_diagnostics": {
+          "topology_id": "small_sparse_test_a",
+          "family": "sparse_backhaul",
+          "difficulty": "hard",
+          "crosshaul_latency_limits_ms": [
+            10.0,
+            1.0,
+            0.25,
+            0.25
+          ],
+          "es_rc_delay_range_ms": {
+            "min": 2.0863,
+            "max": 3.1893
+          },
+          "direct_rc_delay_range_ms": {
+            "min": 0.1348,
+            "max": 0.1522
+          },
+          "min_feasible_crosshaul_delay_by_split_ms": {
+            "S1": 2.0863,
+            "S2": 2.0863,
+            "S3": 2.0863,
+            "S4": 0.1348
+          },
+          "direct_rh_rc_fraction": 0.25,
+          "split_structurally_available": {
+            "S1": true,
+            "S2": true,
+            "S3": true,
+            "S4": true
+          },
+          "split_latency_feasibility": {
+            "S1": {
+              "mode": "es_rc",
+              "limit_ms": 10.0,
+              "compatible_edge_count": 6,
+              "compatible_edge_fraction": 1.0,
+              "min_delay_ms": 2.0863,
+              "max_delay_ms": 3.1893,
+              "strictly_possible_from_link_delay": true
+            },
+            "S2": {
+              "mode": "es_rc",
+              "limit_ms": 1.0,
+              "compatible_edge_count": 0,
+              "compatible_edge_fraction": 0.0,
+              "min_delay_ms": 2.0863,
+              "max_delay_ms": 3.1893,
+              "strictly_possible_from_link_delay": false
+            },
+            "S3": {
+              "mode": "es_rc",
+              "limit_ms": 0.25,
+              "compatible_edge_count": 0,
+              "compatible_edge_fraction": 0.0,
+              "min_delay_ms": 2.0863,
+              "max_delay_ms": 3.1893,
+              "strictly_possible_from_link_delay": false
+            },
+            "S4": {
+              "mode": "direct_rh_rc",
+              "limit_ms": 0.25,
+              "compatible_edge_count": 2,
+              "compatible_edge_fraction": 1.0,
+              "min_delay_ms": 0.1348,
+              "max_delay_ms": 0.1522,
+              "strictly_possible_from_link_delay": true
+            }
+          },
+          "splits_ruled_out_by_link_delay": [
+            "S2",
+            "S3"
+          ]
+        },
+        "per_topology": {
+          "small_sparse_test_a": {
+            "mean_reward": 0.36178907965230633,
+            "std_reward": 0.0,
+            "mean_cost": 93.44942855834961,
+            "std_cost": 0.0,
+            "validity_rate": 1.0,
+            "structural_validity_rate_at_reset": 1.0,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_count": 0,
+            "avg_invalid_reasons_per_time_slot": 0.0,
+            "sla_penalty": 28.263784408569336,
+            "invalid_counts_by_reason": {
+              "missing_direct_rc_link": 0,
+              "missing_rh_es_link": 0,
+              "missing_es_rc_link": 0,
+              "es_capacity_exceeded": 0,
+              "rc_capacity_exceeded": 0,
+              "bandwidth_exceeded": 0,
+              "e2e_latency_exceeded": 0,
+              "crosshaul_latency_exceeded": 0
+            },
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 0.0,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 0.0,
+              "crosshaul_latency_exceeded": 0.0
+            },
+            "first_failing_constraint_counts": {},
+            "bounded_probe_results": [
+              {
+                "result": false,
+                "rhs_considered": 8,
+                "visit_limit": 50000,
+                "is_full_instance": true,
+                "is_exact": true,
+                "status": "exact"
+              }
+            ],
+            "bounded_probe_summary": {
+              "positive_rate": 0.0,
+              "negative_rate": 1.0,
+              "inconclusive_rate": 0.0
+            },
+            "split_distribution": {
+              "S1": 0.375,
+              "S2": 0.5,
+              "S3": 0.125,
+              "S4": 0.0
+            },
+            "cost_breakdown": {
+              "processing_cost": 60.190141677856445,
+              "routing_cost": 3.995503101767228,
+              "reconfiguration_cost": 1.0,
+              "sla_penalty": 28.263784408569336,
+              "es_overuse": 17.2593994140625,
+              "rc_overuse": 0.0,
+              "bandwidth_overuse": 0.0,
+              "e2e_violation": 2.6036342538833614,
+              "crosshaul_violation": 8.400750160217285
+            },
+            "reconfiguration_stats": {
+              "split_changes": 0.0,
+              "es_changes": 2.0,
+              "rc_changes": 0.0,
+              "total_reconfiguration_changes": 2.0,
+              "avg_split_changes_per_transition": 0.0,
+              "avg_es_changes_per_transition": 2.0,
+              "avg_rc_changes_per_transition": 0.0,
+              "avg_total_reconfiguration_changes_per_transition": 2.0,
+              "reconfiguration_cost_pct_of_total_cost": 0.8216034851250023
+            },
+            "topology_metadata": {
+              "generator_seed": 303,
+              "edge_count": 24,
+              "family": "sparse_backhaul",
+              "difficulty": "hard",
+              "description": "Harder project benchmark family with constrained ES-RC redundancy and lower backhaul capacity.",
+              "benchmark_label": "project_small",
+              "paper_aligned": false,
+              "paper_aligned_large": false,
+              "direct_rc_probability": null
+            },
+            "latency_diagnostics": {
+              "topology_id": "small_sparse_test_a",
+              "family": "sparse_backhaul",
+              "difficulty": "hard",
+              "crosshaul_latency_limits_ms": [
+                10.0,
+                1.0,
+                0.25,
+                0.25
+              ],
+              "es_rc_delay_range_ms": {
+                "min": 2.0863,
+                "max": 3.1893
+              },
+              "direct_rc_delay_range_ms": {
+                "min": 0.1348,
+                "max": 0.1522
+              },
+              "min_feasible_crosshaul_delay_by_split_ms": {
+                "S1": 2.0863,
+                "S2": 2.0863,
+                "S3": 2.0863,
+                "S4": 0.1348
+              },
+              "direct_rh_rc_fraction": 0.25,
+              "split_structurally_available": {
+                "S1": true,
+                "S2": true,
+                "S3": true,
+                "S4": true
+              },
+              "split_latency_feasibility": {
+                "S1": {
+                  "mode": "es_rc",
+                  "limit_ms": 10.0,
+                  "compatible_edge_count": 6,
+                  "compatible_edge_fraction": 1.0,
+                  "min_delay_ms": 2.0863,
+                  "max_delay_ms": 3.1893,
+                  "strictly_possible_from_link_delay": true
+                },
+                "S2": {
+                  "mode": "es_rc",
+                  "limit_ms": 1.0,
+                  "compatible_edge_count": 0,
+                  "compatible_edge_fraction": 0.0,
+                  "min_delay_ms": 2.0863,
+                  "max_delay_ms": 3.1893,
+                  "strictly_possible_from_link_delay": false
+                },
+                "S3": {
+                  "mode": "es_rc",
+                  "limit_ms": 0.25,
+                  "compatible_edge_count": 0,
+                  "compatible_edge_fraction": 0.0,
+                  "min_delay_ms": 2.0863,
+                  "max_delay_ms": 3.1893,
+                  "strictly_possible_from_link_delay": false
+                },
+                "S4": {
+                  "mode": "direct_rh_rc",
+                  "limit_ms": 0.25,
+                  "compatible_edge_count": 2,
+                  "compatible_edge_fraction": 1.0,
+                  "min_delay_ms": 0.1348,
+                  "max_delay_ms": 0.1522,
+                  "strictly_possible_from_link_delay": true
+                }
+              },
+              "splits_ruled_out_by_link_delay": [
+                "S2",
+                "S3"
+              ]
+            }
+          }
+        }
+      },
+      "small_direct_test_b": {
+        "benchmark": "small",
+        "topology_pool_name": "test",
+        "selection_mode": "fixed",
+        "constraint_mode": "legacy",
+        "episode_length_time_slots": 2,
+        "topology_ids": [
+          "small_direct_test_b"
+        ],
+        "has_structurally_valid_action": [
+          true
+        ],
+        "has_strictly_valid_action": [
+          false
+        ],
+        "has_greedy_strictly_valid_action": [
+          false
+        ],
+        "has_exact_strictly_valid_action": [
+          false
+        ],
+        "bounded_strict_feasibility_probe": [
+          {
+            "result": false,
+            "rhs_considered": 8,
+            "visit_limit": 50000,
+            "is_full_instance": true,
+            "is_exact": true,
+            "status": "exact"
+          }
+        ],
+        "episode_trace_paths": [
+          "outputs/path_eval_smoke/episode_traces/test_small_direct_test_b_legacy_episode_000.json"
+        ],
+        "episode_trace_csv_paths": [
+          "outputs/path_eval_smoke/test_small_direct_test_b_legacy_episode_000.csv"
+        ],
+        "avg_reward": 0.3733064602719304,
+        "std_reward": 0.0,
+        "avg_cost": 77.61651992797852,
+        "std_cost": 0.0,
+        "valid_rate": 1.0,
+        "strict_feasible_reset_rate": 0.0,
+        "exact_strict_feasible_reset_rate": 0.0,
+        "strict_feasibility_reporting": {
+          "rate_label": "Strict-Feasible Reset Rate",
+          "no_action_label": "Episodes With No Strict-Valid Action",
+          "status": "exact_supported"
+        },
+        "bounded_strict_probe_summary": {
+          "positive_rate": 0.0,
+          "negative_rate": 1.0,
+          "inconclusive_rate": 0.0
+        },
+        "invalid_counts_by_reason": {
+          "missing_direct_rc_link": 0,
+          "missing_rh_es_link": 0,
+          "missing_es_rc_link": 0,
+          "es_capacity_exceeded": 0,
+          "rc_capacity_exceeded": 0,
+          "bandwidth_exceeded": 0,
+          "e2e_latency_exceeded": 0,
+          "crosshaul_latency_exceeded": 0
+        },
+        "invalid_reason_percentages": {
+          "missing_direct_rc_link": 0.0,
+          "missing_rh_es_link": 0.0,
+          "missing_es_rc_link": 0.0,
+          "es_capacity_exceeded": 0.0,
+          "rc_capacity_exceeded": 0.0,
+          "bandwidth_exceeded": 0.0,
+          "e2e_latency_exceeded": 0.0,
+          "crosshaul_latency_exceeded": 0.0
+        },
+        "avg_reconfiguration_stats_per_episode": {
+          "split_changes": 0.0,
+          "es_changes": 0.0,
+          "rc_changes": 0.0,
+          "total_reconfiguration_changes": 0.0,
+          "avg_split_changes_per_transition": 0.0,
+          "avg_es_changes_per_transition": 0.0,
+          "avg_rc_changes_per_transition": 0.0,
+          "avg_total_reconfiguration_changes_per_transition": 0.0,
+          "reconfiguration_cost_pct_of_total_cost": 0.0
+        },
+        "first_failing_constraint_counts": {},
+        "episodes_with_no_strict_valid_action_rate": 1.0,
+        "latency_diagnostics": {
+          "topology_id": "small_direct_test_b",
+          "family": "direct_heavy",
+          "difficulty": "hard",
+          "crosshaul_latency_limits_ms": [
+            10.0,
+            1.0,
+            0.25,
+            0.25
+          ],
+          "es_rc_delay_range_ms": {
+            "min": 0.7381,
+            "max": 2.5017
+          },
+          "direct_rc_delay_range_ms": {
+            "min": 0.1211,
+            "max": 0.144
+          },
+          "min_feasible_crosshaul_delay_by_split_ms": {
+            "S1": 0.7381,
+            "S2": 0.7381,
+            "S3": 0.7381,
+            "S4": 0.1211
+          },
+          "direct_rh_rc_fraction": 0.25,
+          "split_structurally_available": {
+            "S1": true,
+            "S2": true,
+            "S3": true,
+            "S4": true
+          },
+          "split_latency_feasibility": {
+            "S1": {
+              "mode": "es_rc",
+              "limit_ms": 10.0,
+              "compatible_edge_count": 6,
+              "compatible_edge_fraction": 1.0,
+              "min_delay_ms": 0.7381,
+              "max_delay_ms": 2.5017,
+              "strictly_possible_from_link_delay": true
+            },
+            "S2": {
+              "mode": "es_rc",
+              "limit_ms": 1.0,
+              "compatible_edge_count": 2,
+              "compatible_edge_fraction": 0.3333333333333333,
+              "min_delay_ms": 0.7381,
+              "max_delay_ms": 2.5017,
+              "strictly_possible_from_link_delay": true
+            },
+            "S3": {
+              "mode": "es_rc",
+              "limit_ms": 0.25,
+              "compatible_edge_count": 0,
+              "compatible_edge_fraction": 0.0,
+              "min_delay_ms": 0.7381,
+              "max_delay_ms": 2.5017,
+              "strictly_possible_from_link_delay": false
+            },
+            "S4": {
+              "mode": "direct_rh_rc",
+              "limit_ms": 0.25,
+              "compatible_edge_count": 2,
+              "compatible_edge_fraction": 1.0,
+              "min_delay_ms": 0.1211,
+              "max_delay_ms": 0.144,
+              "strictly_possible_from_link_delay": true
+            }
+          },
+          "splits_ruled_out_by_link_delay": [
+            "S3"
+          ]
+        },
+        "per_topology": {
+          "small_direct_test_b": {
+            "mean_reward": 0.3733064602719304,
+            "std_reward": 0.0,
+            "mean_cost": 77.61651992797852,
+            "std_cost": 0.0,
+            "validity_rate": 1.0,
+            "structural_validity_rate_at_reset": 1.0,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_count": 0,
+            "avg_invalid_reasons_per_time_slot": 0.0,
+            "sla_penalty": 15.086513042449951,
+            "invalid_counts_by_reason": {
+              "missing_direct_rc_link": 0,
+              "missing_rh_es_link": 0,
+              "missing_es_rc_link": 0,
+              "es_capacity_exceeded": 0,
+              "rc_capacity_exceeded": 0,
+              "bandwidth_exceeded": 0,
+              "e2e_latency_exceeded": 0,
+              "crosshaul_latency_exceeded": 0
+            },
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 0.0,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 0.0,
+              "crosshaul_latency_exceeded": 0.0
+            },
+            "first_failing_constraint_counts": {},
+            "bounded_probe_results": [
+              {
+                "result": false,
+                "rhs_considered": 8,
+                "visit_limit": 50000,
+                "is_full_instance": true,
+                "is_exact": true,
+                "status": "exact"
+              }
+            ],
+            "bounded_probe_summary": {
+              "positive_rate": 0.0,
+              "negative_rate": 1.0,
+              "inconclusive_rate": 0.0
+            },
+            "split_distribution": {
+              "S1": 0.375,
+              "S2": 0.5,
+              "S3": 0.125,
+              "S4": 0.0
+            },
+            "cost_breakdown": {
+              "processing_cost": 60.190141677856445,
+              "routing_cost": 2.3398613899286835,
+              "reconfiguration_cost": 0.0,
+              "sla_penalty": 15.086513042449951,
+              "es_overuse": 10.543828964233398,
+              "rc_overuse": 0.0,
+              "bandwidth_overuse": 0.0,
+              "e2e_violation": 1.444484253883362,
+              "crosshaul_violation": 3.0982000827789307
+            },
+            "reconfiguration_stats": {
+              "split_changes": 0.0,
+              "es_changes": 0.0,
+              "rc_changes": 0.0,
+              "total_reconfiguration_changes": 0.0,
+              "avg_split_changes_per_transition": 0.0,
+              "avg_es_changes_per_transition": 0.0,
+              "avg_rc_changes_per_transition": 0.0,
+              "avg_total_reconfiguration_changes_per_transition": 0.0,
+              "reconfiguration_cost_pct_of_total_cost": 0.0
+            },
+            "topology_metadata": {
+              "generator_seed": 404,
+              "edge_count": 24,
+              "family": "direct_heavy",
+              "difficulty": "hard",
+              "description": "Harder family with more policy pressure toward direct RH-RC routing and tighter ES/RC links.",
+              "benchmark_label": "project_small",
+              "paper_aligned": false,
+              "paper_aligned_large": false,
+              "direct_rc_probability": null
+            },
+            "latency_diagnostics": {
+              "topology_id": "small_direct_test_b",
+              "family": "direct_heavy",
+              "difficulty": "hard",
+              "crosshaul_latency_limits_ms": [
+                10.0,
+                1.0,
+                0.25,
+                0.25
+              ],
+              "es_rc_delay_range_ms": {
+                "min": 0.7381,
+                "max": 2.5017
+              },
+              "direct_rc_delay_range_ms": {
+                "min": 0.1211,
+                "max": 0.144
+              },
+              "min_feasible_crosshaul_delay_by_split_ms": {
+                "S1": 0.7381,
+                "S2": 0.7381,
+                "S3": 0.7381,
+                "S4": 0.1211
+              },
+              "direct_rh_rc_fraction": 0.25,
+              "split_structurally_available": {
+                "S1": true,
+                "S2": true,
+                "S3": true,
+                "S4": true
+              },
+              "split_latency_feasibility": {
+                "S1": {
+                  "mode": "es_rc",
+                  "limit_ms": 10.0,
+                  "compatible_edge_count": 6,
+                  "compatible_edge_fraction": 1.0,
+                  "min_delay_ms": 0.7381,
+                  "max_delay_ms": 2.5017,
+                  "strictly_possible_from_link_delay": true
+                },
+                "S2": {
+                  "mode": "es_rc",
+                  "limit_ms": 1.0,
+                  "compatible_edge_count": 2,
+                  "compatible_edge_fraction": 0.3333333333333333,
+                  "min_delay_ms": 0.7381,
+                  "max_delay_ms": 2.5017,
+                  "strictly_possible_from_link_delay": true
+                },
+                "S3": {
+                  "mode": "es_rc",
+                  "limit_ms": 0.25,
+                  "compatible_edge_count": 0,
+                  "compatible_edge_fraction": 0.0,
+                  "min_delay_ms": 0.7381,
+                  "max_delay_ms": 2.5017,
+                  "strictly_possible_from_link_delay": false
+                },
+                "S4": {
+                  "mode": "direct_rh_rc",
+                  "limit_ms": 0.25,
+                  "compatible_edge_count": 2,
+                  "compatible_edge_fraction": 1.0,
+                  "min_delay_ms": 0.1211,
+                  "max_delay_ms": 0.144,
+                  "strictly_possible_from_link_delay": true
+                }
+              },
+              "splits_ruled_out_by_link_delay": [
+                "S3"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "constraint_mode_comparison": {
+    "train_pool": {
+      "small_balanced_train_a": {
+        "mode_summaries": {
+          "legacy": {
+            "valid_rate": 1.0,
+            "avg_cost": 76.81243515014648,
+            "avg_reward": 0.3739643638092214,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_rate": 0.0,
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 0.0,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 0.0,
+              "crosshaul_latency_exceeded": 0.0
+            },
+            "first_failing_constraint_counts": {},
+            "strict_feasibility_reporting": {
+              "rate_label": "Strict-Feasible Reset Rate",
+              "no_action_label": "Episodes With No Strict-Valid Action",
+              "status": "exact_supported"
+            }
+          },
+          "strict_connectivity_only": {
+            "valid_rate": 1.0,
+            "avg_cost": 76.81243515014648,
+            "avg_reward": 0.3739643638092214,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_rate": 0.0,
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 0.0,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 0.0,
+              "crosshaul_latency_exceeded": 0.0
+            },
+            "first_failing_constraint_counts": {},
+            "strict_feasibility_reporting": {
+              "rate_label": "Strict-Feasible Reset Rate",
+              "no_action_label": "Episodes With No Strict-Valid Action",
+              "status": "exact_supported"
+            }
+          },
+          "strict_connectivity_plus_capacity": {
+            "valid_rate": 0.0,
+            "avg_cost": Infinity,
+            "avg_reward": -0.125,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_rate": 0.0,
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 1.0,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 1.0,
+              "crosshaul_latency_exceeded": 1.0
+            },
+            "first_failing_constraint_counts": {
+              "es_capacity_exceeded": 2
+            },
+            "strict_feasibility_reporting": {
+              "rate_label": "Strict-Feasible Reset Rate",
+              "no_action_label": "Episodes With No Strict-Valid Action",
+              "status": "exact_supported"
+            }
+          },
+          "strict_connectivity_plus_capacity_plus_bandwidth": {
+            "valid_rate": 0.0,
+            "avg_cost": Infinity,
+            "avg_reward": -0.125,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_rate": 0.0,
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 1.0,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 1.0,
+              "crosshaul_latency_exceeded": 1.0
+            },
+            "first_failing_constraint_counts": {
+              "es_capacity_exceeded": 2
+            },
+            "strict_feasibility_reporting": {
+              "rate_label": "Strict-Feasible Reset Rate",
+              "no_action_label": "Episodes With No Strict-Valid Action",
+              "status": "exact_supported"
+            }
+          },
+          "strict_full": {
+            "valid_rate": 0.0,
+            "avg_cost": Infinity,
+            "avg_reward": -0.375,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_rate": 0.0,
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 1.0,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 1.0,
+              "crosshaul_latency_exceeded": 1.0
+            },
+            "first_failing_constraint_counts": {
+              "es_capacity_exceeded": 2
+            },
+            "strict_feasibility_reporting": {
+              "rate_label": "Strict-Feasible Reset Rate",
+              "no_action_label": "Episodes With No Strict-Valid Action",
+              "status": "exact_supported"
+            }
+          }
+        },
+        "legacy": {
+          "valid_rate": 1.0,
+          "avg_cost": 76.81243515014648,
+          "avg_reward": 0.3739643638092214
+        },
+        "strict": {
+          "valid_rate": 0.0,
+          "avg_cost": Infinity,
+          "avg_reward": -0.375,
+          "strict_feasible_reset_rate": 0.0,
+          "exact_strict_feasible_reset_rate": 0.0,
+          "episodes_with_no_strict_valid_action_rate": 1.0,
+          "first_failing_constraint_counts": {
+            "es_capacity_exceeded": 2
+          },
+          "invalid_reason_percentages": {
+            "missing_direct_rc_link": 0.0,
+            "missing_rh_es_link": 0.0,
+            "missing_es_rc_link": 0.0,
+            "es_capacity_exceeded": 1.0,
+            "rc_capacity_exceeded": 0.0,
+            "bandwidth_exceeded": 0.0,
+            "e2e_latency_exceeded": 1.0,
+            "crosshaul_latency_exceeded": 1.0
+          },
+          "strict_feasibility_reporting": {
+            "rate_label": "Strict-Feasible Reset Rate",
+            "no_action_label": "Episodes With No Strict-Valid Action",
+            "status": "exact_supported"
+          }
+        },
+        "first_failing_constraint_class": "strict_connectivity_plus_capacity",
+        "no_strict_valid_reset_count": 1,
+        "valid_rate_gap": 1.0
+      },
+      "small_clustered_train_b": {
+        "mode_summaries": {
+          "legacy": {
+            "valid_rate": 1.0,
+            "avg_cost": 67.69222640991211,
+            "avg_reward": 0.3832402019208139,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_rate": 0.0,
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 0.0,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 0.0,
+              "crosshaul_latency_exceeded": 0.0
+            },
+            "first_failing_constraint_counts": {},
+            "strict_feasibility_reporting": {
+              "rate_label": "Strict-Feasible Reset Rate",
+              "no_action_label": "Episodes With No Strict-Valid Action",
+              "status": "exact_supported"
+            }
+          },
+          "strict_connectivity_only": {
+            "valid_rate": 1.0,
+            "avg_cost": 67.69222640991211,
+            "avg_reward": 0.3832402019208139,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_rate": 0.0,
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 0.0,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 0.0,
+              "crosshaul_latency_exceeded": 0.0
+            },
+            "first_failing_constraint_counts": {},
+            "strict_feasibility_reporting": {
+              "rate_label": "Strict-Feasible Reset Rate",
+              "no_action_label": "Episodes With No Strict-Valid Action",
+              "status": "exact_supported"
+            }
+          },
+          "strict_connectivity_plus_capacity": {
+            "valid_rate": 0.5,
+            "avg_cost": 59.074974060058594,
+            "avg_reward": 0.13374799927046704,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_rate": 0.0,
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 0.5,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 0.5,
+              "crosshaul_latency_exceeded": 0.5
+            },
+            "first_failing_constraint_counts": {
+              "es_capacity_exceeded": 1
+            },
+            "strict_feasibility_reporting": {
+              "rate_label": "Strict-Feasible Reset Rate",
+              "no_action_label": "Episodes With No Strict-Valid Action",
+              "status": "exact_supported"
+            }
+          },
+          "strict_connectivity_plus_capacity_plus_bandwidth": {
+            "valid_rate": 0.5,
+            "avg_cost": 59.074974060058594,
+            "avg_reward": 0.13374799927046704,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_rate": 0.0,
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 0.5,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 0.5,
+              "crosshaul_latency_exceeded": 0.5
+            },
+            "first_failing_constraint_counts": {
+              "es_capacity_exceeded": 1
+            },
+            "strict_feasibility_reporting": {
+              "rate_label": "Strict-Feasible Reset Rate",
+              "no_action_label": "Episodes With No Strict-Valid Action",
+              "status": "exact_supported"
+            }
+          },
+          "strict_full": {
+            "valid_rate": 0.0,
+            "avg_cost": Infinity,
+            "avg_reward": -0.3125,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_rate": 0.0,
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 0.5,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 1.0,
+              "crosshaul_latency_exceeded": 1.0
+            },
+            "first_failing_constraint_counts": {
+              "e2e_latency_exceeded": 1,
+              "es_capacity_exceeded": 1
+            },
+            "strict_feasibility_reporting": {
+              "rate_label": "Strict-Feasible Reset Rate",
+              "no_action_label": "Episodes With No Strict-Valid Action",
+              "status": "exact_supported"
+            }
+          }
+        },
+        "legacy": {
+          "valid_rate": 1.0,
+          "avg_cost": 67.69222640991211,
+          "avg_reward": 0.3832402019208139
+        },
+        "strict": {
+          "valid_rate": 0.0,
+          "avg_cost": Infinity,
+          "avg_reward": -0.3125,
+          "strict_feasible_reset_rate": 0.0,
+          "exact_strict_feasible_reset_rate": 0.0,
+          "episodes_with_no_strict_valid_action_rate": 1.0,
+          "first_failing_constraint_counts": {
+            "e2e_latency_exceeded": 1,
+            "es_capacity_exceeded": 1
+          },
+          "invalid_reason_percentages": {
+            "missing_direct_rc_link": 0.0,
+            "missing_rh_es_link": 0.0,
+            "missing_es_rc_link": 0.0,
+            "es_capacity_exceeded": 0.5,
+            "rc_capacity_exceeded": 0.0,
+            "bandwidth_exceeded": 0.0,
+            "e2e_latency_exceeded": 1.0,
+            "crosshaul_latency_exceeded": 1.0
+          },
+          "strict_feasibility_reporting": {
+            "rate_label": "Strict-Feasible Reset Rate",
+            "no_action_label": "Episodes With No Strict-Valid Action",
+            "status": "exact_supported"
+          }
+        },
+        "first_failing_constraint_class": "strict_connectivity_plus_capacity",
+        "no_strict_valid_reset_count": 1,
+        "valid_rate_gap": 1.0
+      }
+    },
+    "test_pool": {
+      "small_sparse_test_a": {
+        "mode_summaries": {
+          "legacy": {
+            "valid_rate": 1.0,
+            "avg_cost": 93.44942855834961,
+            "avg_reward": 0.36178907965230633,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_rate": 0.0,
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 0.0,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 0.0,
+              "crosshaul_latency_exceeded": 0.0
+            },
+            "first_failing_constraint_counts": {},
+            "strict_feasibility_reporting": {
+              "rate_label": "Strict-Feasible Reset Rate",
+              "no_action_label": "Episodes With No Strict-Valid Action",
+              "status": "exact_supported"
+            }
+          },
+          "strict_connectivity_only": {
+            "valid_rate": 1.0,
+            "avg_cost": 93.44942855834961,
+            "avg_reward": 0.36178907965230633,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_rate": 0.0,
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 0.0,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 0.0,
+              "crosshaul_latency_exceeded": 0.0
+            },
+            "first_failing_constraint_counts": {},
+            "strict_feasibility_reporting": {
+              "rate_label": "Strict-Feasible Reset Rate",
+              "no_action_label": "Episodes With No Strict-Valid Action",
+              "status": "exact_supported"
+            }
+          },
+          "strict_connectivity_plus_capacity": {
+            "valid_rate": 0.0,
+            "avg_cost": Infinity,
+            "avg_reward": -0.125,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_rate": 0.0,
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 1.0,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 1.0,
+              "crosshaul_latency_exceeded": 1.0
+            },
+            "first_failing_constraint_counts": {
+              "es_capacity_exceeded": 2
+            },
+            "strict_feasibility_reporting": {
+              "rate_label": "Strict-Feasible Reset Rate",
+              "no_action_label": "Episodes With No Strict-Valid Action",
+              "status": "exact_supported"
+            }
+          },
+          "strict_connectivity_plus_capacity_plus_bandwidth": {
+            "valid_rate": 0.0,
+            "avg_cost": Infinity,
+            "avg_reward": -0.125,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_rate": 0.0,
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 1.0,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 1.0,
+              "crosshaul_latency_exceeded": 1.0
+            },
+            "first_failing_constraint_counts": {
+              "es_capacity_exceeded": 2
+            },
+            "strict_feasibility_reporting": {
+              "rate_label": "Strict-Feasible Reset Rate",
+              "no_action_label": "Episodes With No Strict-Valid Action",
+              "status": "exact_supported"
+            }
+          },
+          "strict_full": {
+            "valid_rate": 0.0,
+            "avg_cost": Infinity,
+            "avg_reward": -0.375,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_rate": 0.0,
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 1.0,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 1.0,
+              "crosshaul_latency_exceeded": 1.0
+            },
+            "first_failing_constraint_counts": {
+              "es_capacity_exceeded": 2
+            },
+            "strict_feasibility_reporting": {
+              "rate_label": "Strict-Feasible Reset Rate",
+              "no_action_label": "Episodes With No Strict-Valid Action",
+              "status": "exact_supported"
+            }
+          }
+        },
+        "legacy": {
+          "valid_rate": 1.0,
+          "avg_cost": 93.44942855834961,
+          "avg_reward": 0.36178907965230633
+        },
+        "strict": {
+          "valid_rate": 0.0,
+          "avg_cost": Infinity,
+          "avg_reward": -0.375,
+          "strict_feasible_reset_rate": 0.0,
+          "exact_strict_feasible_reset_rate": 0.0,
+          "episodes_with_no_strict_valid_action_rate": 1.0,
+          "first_failing_constraint_counts": {
+            "es_capacity_exceeded": 2
+          },
+          "invalid_reason_percentages": {
+            "missing_direct_rc_link": 0.0,
+            "missing_rh_es_link": 0.0,
+            "missing_es_rc_link": 0.0,
+            "es_capacity_exceeded": 1.0,
+            "rc_capacity_exceeded": 0.0,
+            "bandwidth_exceeded": 0.0,
+            "e2e_latency_exceeded": 1.0,
+            "crosshaul_latency_exceeded": 1.0
+          },
+          "strict_feasibility_reporting": {
+            "rate_label": "Strict-Feasible Reset Rate",
+            "no_action_label": "Episodes With No Strict-Valid Action",
+            "status": "exact_supported"
+          }
+        },
+        "first_failing_constraint_class": "strict_connectivity_plus_capacity",
+        "no_strict_valid_reset_count": 1,
+        "valid_rate_gap": 1.0
+      },
+      "small_direct_test_b": {
+        "mode_summaries": {
+          "legacy": {
+            "valid_rate": 1.0,
+            "avg_cost": 77.61651992797852,
+            "avg_reward": 0.3733064602719304,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_rate": 0.0,
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 0.0,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 0.0,
+              "crosshaul_latency_exceeded": 0.0
+            },
+            "first_failing_constraint_counts": {},
+            "strict_feasibility_reporting": {
+              "rate_label": "Strict-Feasible Reset Rate",
+              "no_action_label": "Episodes With No Strict-Valid Action",
+              "status": "exact_supported"
+            }
+          },
+          "strict_connectivity_only": {
+            "valid_rate": 1.0,
+            "avg_cost": 77.61651992797852,
+            "avg_reward": 0.3733064602719304,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_rate": 0.0,
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 0.0,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 0.0,
+              "crosshaul_latency_exceeded": 0.0
+            },
+            "first_failing_constraint_counts": {},
+            "strict_feasibility_reporting": {
+              "rate_label": "Strict-Feasible Reset Rate",
+              "no_action_label": "Episodes With No Strict-Valid Action",
+              "status": "exact_supported"
+            }
+          },
+          "strict_connectivity_plus_capacity": {
+            "valid_rate": 0.0,
+            "avg_cost": Infinity,
+            "avg_reward": -0.125,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_rate": 0.0,
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 1.0,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 1.0,
+              "crosshaul_latency_exceeded": 1.0
+            },
+            "first_failing_constraint_counts": {
+              "es_capacity_exceeded": 2
+            },
+            "strict_feasibility_reporting": {
+              "rate_label": "Strict-Feasible Reset Rate",
+              "no_action_label": "Episodes With No Strict-Valid Action",
+              "status": "exact_supported"
+            }
+          },
+          "strict_connectivity_plus_capacity_plus_bandwidth": {
+            "valid_rate": 0.0,
+            "avg_cost": Infinity,
+            "avg_reward": -0.125,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_rate": 0.0,
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 1.0,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 1.0,
+              "crosshaul_latency_exceeded": 1.0
+            },
+            "first_failing_constraint_counts": {
+              "es_capacity_exceeded": 2
+            },
+            "strict_feasibility_reporting": {
+              "rate_label": "Strict-Feasible Reset Rate",
+              "no_action_label": "Episodes With No Strict-Valid Action",
+              "status": "exact_supported"
+            }
+          },
+          "strict_full": {
+            "valid_rate": 0.0,
+            "avg_cost": Infinity,
+            "avg_reward": -0.375,
+            "strict_feasible_reset_rate": 0.0,
+            "exact_strict_feasible_reset_rate": 0.0,
+            "invalid_reason_percentages": {
+              "missing_direct_rc_link": 0.0,
+              "missing_rh_es_link": 0.0,
+              "missing_es_rc_link": 0.0,
+              "es_capacity_exceeded": 1.0,
+              "rc_capacity_exceeded": 0.0,
+              "bandwidth_exceeded": 0.0,
+              "e2e_latency_exceeded": 1.0,
+              "crosshaul_latency_exceeded": 1.0
+            },
+            "first_failing_constraint_counts": {
+              "es_capacity_exceeded": 2
+            },
+            "strict_feasibility_reporting": {
+              "rate_label": "Strict-Feasible Reset Rate",
+              "no_action_label": "Episodes With No Strict-Valid Action",
+              "status": "exact_supported"
+            }
+          }
+        },
+        "legacy": {
+          "valid_rate": 1.0,
+          "avg_cost": 77.61651992797852,
+          "avg_reward": 0.3733064602719304
+        },
+        "strict": {
+          "valid_rate": 0.0,
+          "avg_cost": Infinity,
+          "avg_reward": -0.375,
+          "strict_feasible_reset_rate": 0.0,
+          "exact_strict_feasible_reset_rate": 0.0,
+          "episodes_with_no_strict_valid_action_rate": 1.0,
+          "first_failing_constraint_counts": {
+            "es_capacity_exceeded": 2
+          },
+          "invalid_reason_percentages": {
+            "missing_direct_rc_link": 0.0,
+            "missing_rh_es_link": 0.0,
+            "missing_es_rc_link": 0.0,
+            "es_capacity_exceeded": 1.0,
+            "rc_capacity_exceeded": 0.0,
+            "bandwidth_exceeded": 0.0,
+            "e2e_latency_exceeded": 1.0,
+            "crosshaul_latency_exceeded": 1.0
+          },
+          "strict_feasibility_reporting": {
+            "rate_label": "Strict-Feasible Reset Rate",
+            "no_action_label": "Episodes With No Strict-Valid Action",
+            "status": "exact_supported"
+          }
+        },
+        "first_failing_constraint_class": "strict_connectivity_plus_capacity",
+        "no_strict_valid_reset_count": 1,
+        "valid_rate_gap": 1.0
+      }
+    }
+  },
+  "csv_exports": {
+    "training_episode_metrics": "outputs/path_eval_smoke/training_episode_metrics.csv",
+    "evaluation_topology_summary": "outputs/path_eval_smoke/evaluation_topology_summary.csv",
+    "invalid_reason_summary": "outputs/path_eval_smoke/invalid_reason_summary.csv",
+    "timing_profile": "outputs/path_eval_smoke/timing_profile.csv",
+    "episode_trace_csvs": [
+      "outputs/path_eval_smoke/train_small_balanced_train_a_legacy_episode_000.csv",
+      "outputs/path_eval_smoke/train_small_clustered_train_b_legacy_episode_000.csv",
+      "outputs/path_eval_smoke/test_small_sparse_test_a_legacy_episode_000.csv",
+      "outputs/path_eval_smoke/test_small_direct_test_b_legacy_episode_000.csv"
+    ]
+  }
+}

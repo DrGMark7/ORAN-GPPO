@@ -1,0 +1,1066 @@
+{
+  "config": {
+    "benchmark": "paper_small",
+    "benchmark_label": "paper_small",
+    "train_selection_mode": "random_per_reset",
+    "constraint_mode": "legacy",
+    "episode_length_time_slots": 288,
+    "paper_aligned_episode_length": true,
+    "paper_mode": true,
+    "paper_total_timesteps": 2,
+    "paper_num_envs": 1,
+    "seed": 42,
+    "dimensions": {
+      "num_rhs": 8,
+      "num_ess": 3,
+      "num_rcs": 2
+    },
+    "gnn_hidden_dim": 1024,
+    "gnn_input_dim": 7,
+    "include_node_index": true
+  },
+  "benchmark_audit": {
+    "train": {
+      "paper_small_topology_a": {
+        "topology_id": "paper_small_topology_a",
+        "family": "balanced",
+        "difficulty": "moderate",
+        "crosshaul_latency_limits_ms": [
+          10.0,
+          1.0,
+          0.25,
+          0.25
+        ],
+        "es_rc_delay_range_ms": {
+          "min": 0.7889,
+          "max": 3.1521
+        },
+        "direct_rc_delay_range_ms": {
+          "min": 0.2172,
+          "max": 0.2172
+        },
+        "min_feasible_crosshaul_delay_by_split_ms": {
+          "S1": 0.7889,
+          "S2": 0.7889,
+          "S3": 0.7889,
+          "S4": 0.2172
+        },
+        "direct_rh_rc_fraction": 0.125,
+        "split_structurally_available": {
+          "S1": true,
+          "S2": true,
+          "S3": true,
+          "S4": true
+        },
+        "split_latency_feasibility": {
+          "S1": {
+            "mode": "es_rc",
+            "limit_ms": 10.0,
+            "compatible_edge_count": 6,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.7889,
+            "max_delay_ms": 3.1521,
+            "strictly_possible_from_link_delay": true
+          },
+          "S2": {
+            "mode": "es_rc",
+            "limit_ms": 1.0,
+            "compatible_edge_count": 1,
+            "compatible_edge_fraction": 0.16666666666666666,
+            "min_delay_ms": 0.7889,
+            "max_delay_ms": 3.1521,
+            "strictly_possible_from_link_delay": true
+          },
+          "S3": {
+            "mode": "es_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": 0.7889,
+            "max_delay_ms": 3.1521,
+            "strictly_possible_from_link_delay": false
+          },
+          "S4": {
+            "mode": "direct_rh_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 1,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.2172,
+            "max_delay_ms": 0.2172,
+            "strictly_possible_from_link_delay": true
+          }
+        },
+        "splits_ruled_out_by_link_delay": [
+          "S3"
+        ]
+      },
+      "paper_small_topology_b": {
+        "topology_id": "paper_small_topology_b",
+        "family": "clustered",
+        "difficulty": "moderate",
+        "crosshaul_latency_limits_ms": [
+          10.0,
+          1.0,
+          0.25,
+          0.25
+        ],
+        "es_rc_delay_range_ms": {
+          "min": 0.5972,
+          "max": 3.4501
+        },
+        "direct_rc_delay_range_ms": {
+          "min": null,
+          "max": null
+        },
+        "min_feasible_crosshaul_delay_by_split_ms": {
+          "S1": 0.5972,
+          "S2": 0.5972,
+          "S3": 0.5972,
+          "S4": null
+        },
+        "direct_rh_rc_fraction": 0.0,
+        "split_structurally_available": {
+          "S1": true,
+          "S2": true,
+          "S3": true,
+          "S4": false
+        },
+        "split_latency_feasibility": {
+          "S1": {
+            "mode": "es_rc",
+            "limit_ms": 10.0,
+            "compatible_edge_count": 6,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.5972,
+            "max_delay_ms": 3.4501,
+            "strictly_possible_from_link_delay": true
+          },
+          "S2": {
+            "mode": "es_rc",
+            "limit_ms": 1.0,
+            "compatible_edge_count": 1,
+            "compatible_edge_fraction": 0.16666666666666666,
+            "min_delay_ms": 0.5972,
+            "max_delay_ms": 3.4501,
+            "strictly_possible_from_link_delay": true
+          },
+          "S3": {
+            "mode": "es_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": 0.5972,
+            "max_delay_ms": 3.4501,
+            "strictly_possible_from_link_delay": false
+          },
+          "S4": {
+            "mode": "direct_rh_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": null,
+            "max_delay_ms": null,
+            "strictly_possible_from_link_delay": false
+          }
+        },
+        "splits_ruled_out_by_link_delay": [
+          "S3",
+          "S4"
+        ]
+      },
+      "paper_small_topology_c": {
+        "topology_id": "paper_small_topology_c",
+        "family": "sparse_backhaul",
+        "difficulty": "hard",
+        "crosshaul_latency_limits_ms": [
+          10.0,
+          1.0,
+          0.25,
+          0.25
+        ],
+        "es_rc_delay_range_ms": {
+          "min": 1.1655,
+          "max": 3.2631
+        },
+        "direct_rc_delay_range_ms": {
+          "min": null,
+          "max": null
+        },
+        "min_feasible_crosshaul_delay_by_split_ms": {
+          "S1": 1.1655,
+          "S2": 1.1655,
+          "S3": 1.1655,
+          "S4": null
+        },
+        "direct_rh_rc_fraction": 0.0,
+        "split_structurally_available": {
+          "S1": true,
+          "S2": true,
+          "S3": true,
+          "S4": false
+        },
+        "split_latency_feasibility": {
+          "S1": {
+            "mode": "es_rc",
+            "limit_ms": 10.0,
+            "compatible_edge_count": 6,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 1.1655,
+            "max_delay_ms": 3.2631,
+            "strictly_possible_from_link_delay": true
+          },
+          "S2": {
+            "mode": "es_rc",
+            "limit_ms": 1.0,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": 1.1655,
+            "max_delay_ms": 3.2631,
+            "strictly_possible_from_link_delay": false
+          },
+          "S3": {
+            "mode": "es_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": 1.1655,
+            "max_delay_ms": 3.2631,
+            "strictly_possible_from_link_delay": false
+          },
+          "S4": {
+            "mode": "direct_rh_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": null,
+            "max_delay_ms": null,
+            "strictly_possible_from_link_delay": false
+          }
+        },
+        "splits_ruled_out_by_link_delay": [
+          "S2",
+          "S3",
+          "S4"
+        ]
+      },
+      "paper_small_topology_d": {
+        "topology_id": "paper_small_topology_d",
+        "family": "direct_heavy",
+        "difficulty": "hard",
+        "crosshaul_latency_limits_ms": [
+          10.0,
+          1.0,
+          0.25,
+          0.25
+        ],
+        "es_rc_delay_range_ms": {
+          "min": 0.9545,
+          "max": 3.475
+        },
+        "direct_rc_delay_range_ms": {
+          "min": 0.136,
+          "max": 0.136
+        },
+        "min_feasible_crosshaul_delay_by_split_ms": {
+          "S1": 0.9545,
+          "S2": 0.9545,
+          "S3": 0.9545,
+          "S4": 0.136
+        },
+        "direct_rh_rc_fraction": 0.125,
+        "split_structurally_available": {
+          "S1": true,
+          "S2": true,
+          "S3": true,
+          "S4": true
+        },
+        "split_latency_feasibility": {
+          "S1": {
+            "mode": "es_rc",
+            "limit_ms": 10.0,
+            "compatible_edge_count": 6,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.9545,
+            "max_delay_ms": 3.475,
+            "strictly_possible_from_link_delay": true
+          },
+          "S2": {
+            "mode": "es_rc",
+            "limit_ms": 1.0,
+            "compatible_edge_count": 1,
+            "compatible_edge_fraction": 0.16666666666666666,
+            "min_delay_ms": 0.9545,
+            "max_delay_ms": 3.475,
+            "strictly_possible_from_link_delay": true
+          },
+          "S3": {
+            "mode": "es_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": 0.9545,
+            "max_delay_ms": 3.475,
+            "strictly_possible_from_link_delay": false
+          },
+          "S4": {
+            "mode": "direct_rh_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 1,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.136,
+            "max_delay_ms": 0.136,
+            "strictly_possible_from_link_delay": true
+          }
+        },
+        "splits_ruled_out_by_link_delay": [
+          "S3"
+        ]
+      },
+      "paper_small_topology_e": {
+        "topology_id": "paper_small_topology_e",
+        "family": "balanced",
+        "difficulty": "moderate",
+        "crosshaul_latency_limits_ms": [
+          10.0,
+          1.0,
+          0.25,
+          0.25
+        ],
+        "es_rc_delay_range_ms": {
+          "min": 0.334,
+          "max": 3.0943
+        },
+        "direct_rc_delay_range_ms": {
+          "min": 0.1871,
+          "max": 0.2191
+        },
+        "min_feasible_crosshaul_delay_by_split_ms": {
+          "S1": 0.334,
+          "S2": 0.334,
+          "S3": 0.334,
+          "S4": 0.1871
+        },
+        "direct_rh_rc_fraction": 0.25,
+        "split_structurally_available": {
+          "S1": true,
+          "S2": true,
+          "S3": true,
+          "S4": true
+        },
+        "split_latency_feasibility": {
+          "S1": {
+            "mode": "es_rc",
+            "limit_ms": 10.0,
+            "compatible_edge_count": 6,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.334,
+            "max_delay_ms": 3.0943,
+            "strictly_possible_from_link_delay": true
+          },
+          "S2": {
+            "mode": "es_rc",
+            "limit_ms": 1.0,
+            "compatible_edge_count": 3,
+            "compatible_edge_fraction": 0.5,
+            "min_delay_ms": 0.334,
+            "max_delay_ms": 3.0943,
+            "strictly_possible_from_link_delay": true
+          },
+          "S3": {
+            "mode": "es_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": 0.334,
+            "max_delay_ms": 3.0943,
+            "strictly_possible_from_link_delay": false
+          },
+          "S4": {
+            "mode": "direct_rh_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 2,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.1871,
+            "max_delay_ms": 0.2191,
+            "strictly_possible_from_link_delay": true
+          }
+        },
+        "splits_ruled_out_by_link_delay": [
+          "S3"
+        ]
+      }
+    },
+    "test": {
+      "paper_small_topology_a": {
+        "topology_id": "paper_small_topology_a",
+        "family": "balanced",
+        "difficulty": "moderate",
+        "crosshaul_latency_limits_ms": [
+          10.0,
+          1.0,
+          0.25,
+          0.25
+        ],
+        "es_rc_delay_range_ms": {
+          "min": 0.7889,
+          "max": 3.1521
+        },
+        "direct_rc_delay_range_ms": {
+          "min": 0.2172,
+          "max": 0.2172
+        },
+        "min_feasible_crosshaul_delay_by_split_ms": {
+          "S1": 0.7889,
+          "S2": 0.7889,
+          "S3": 0.7889,
+          "S4": 0.2172
+        },
+        "direct_rh_rc_fraction": 0.125,
+        "split_structurally_available": {
+          "S1": true,
+          "S2": true,
+          "S3": true,
+          "S4": true
+        },
+        "split_latency_feasibility": {
+          "S1": {
+            "mode": "es_rc",
+            "limit_ms": 10.0,
+            "compatible_edge_count": 6,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.7889,
+            "max_delay_ms": 3.1521,
+            "strictly_possible_from_link_delay": true
+          },
+          "S2": {
+            "mode": "es_rc",
+            "limit_ms": 1.0,
+            "compatible_edge_count": 1,
+            "compatible_edge_fraction": 0.16666666666666666,
+            "min_delay_ms": 0.7889,
+            "max_delay_ms": 3.1521,
+            "strictly_possible_from_link_delay": true
+          },
+          "S3": {
+            "mode": "es_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": 0.7889,
+            "max_delay_ms": 3.1521,
+            "strictly_possible_from_link_delay": false
+          },
+          "S4": {
+            "mode": "direct_rh_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 1,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.2172,
+            "max_delay_ms": 0.2172,
+            "strictly_possible_from_link_delay": true
+          }
+        },
+        "splits_ruled_out_by_link_delay": [
+          "S3"
+        ]
+      },
+      "paper_small_topology_b": {
+        "topology_id": "paper_small_topology_b",
+        "family": "clustered",
+        "difficulty": "moderate",
+        "crosshaul_latency_limits_ms": [
+          10.0,
+          1.0,
+          0.25,
+          0.25
+        ],
+        "es_rc_delay_range_ms": {
+          "min": 0.5972,
+          "max": 3.4501
+        },
+        "direct_rc_delay_range_ms": {
+          "min": null,
+          "max": null
+        },
+        "min_feasible_crosshaul_delay_by_split_ms": {
+          "S1": 0.5972,
+          "S2": 0.5972,
+          "S3": 0.5972,
+          "S4": null
+        },
+        "direct_rh_rc_fraction": 0.0,
+        "split_structurally_available": {
+          "S1": true,
+          "S2": true,
+          "S3": true,
+          "S4": false
+        },
+        "split_latency_feasibility": {
+          "S1": {
+            "mode": "es_rc",
+            "limit_ms": 10.0,
+            "compatible_edge_count": 6,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.5972,
+            "max_delay_ms": 3.4501,
+            "strictly_possible_from_link_delay": true
+          },
+          "S2": {
+            "mode": "es_rc",
+            "limit_ms": 1.0,
+            "compatible_edge_count": 1,
+            "compatible_edge_fraction": 0.16666666666666666,
+            "min_delay_ms": 0.5972,
+            "max_delay_ms": 3.4501,
+            "strictly_possible_from_link_delay": true
+          },
+          "S3": {
+            "mode": "es_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": 0.5972,
+            "max_delay_ms": 3.4501,
+            "strictly_possible_from_link_delay": false
+          },
+          "S4": {
+            "mode": "direct_rh_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": null,
+            "max_delay_ms": null,
+            "strictly_possible_from_link_delay": false
+          }
+        },
+        "splits_ruled_out_by_link_delay": [
+          "S3",
+          "S4"
+        ]
+      },
+      "paper_small_topology_c": {
+        "topology_id": "paper_small_topology_c",
+        "family": "sparse_backhaul",
+        "difficulty": "hard",
+        "crosshaul_latency_limits_ms": [
+          10.0,
+          1.0,
+          0.25,
+          0.25
+        ],
+        "es_rc_delay_range_ms": {
+          "min": 1.1655,
+          "max": 3.2631
+        },
+        "direct_rc_delay_range_ms": {
+          "min": null,
+          "max": null
+        },
+        "min_feasible_crosshaul_delay_by_split_ms": {
+          "S1": 1.1655,
+          "S2": 1.1655,
+          "S3": 1.1655,
+          "S4": null
+        },
+        "direct_rh_rc_fraction": 0.0,
+        "split_structurally_available": {
+          "S1": true,
+          "S2": true,
+          "S3": true,
+          "S4": false
+        },
+        "split_latency_feasibility": {
+          "S1": {
+            "mode": "es_rc",
+            "limit_ms": 10.0,
+            "compatible_edge_count": 6,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 1.1655,
+            "max_delay_ms": 3.2631,
+            "strictly_possible_from_link_delay": true
+          },
+          "S2": {
+            "mode": "es_rc",
+            "limit_ms": 1.0,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": 1.1655,
+            "max_delay_ms": 3.2631,
+            "strictly_possible_from_link_delay": false
+          },
+          "S3": {
+            "mode": "es_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": 1.1655,
+            "max_delay_ms": 3.2631,
+            "strictly_possible_from_link_delay": false
+          },
+          "S4": {
+            "mode": "direct_rh_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": null,
+            "max_delay_ms": null,
+            "strictly_possible_from_link_delay": false
+          }
+        },
+        "splits_ruled_out_by_link_delay": [
+          "S2",
+          "S3",
+          "S4"
+        ]
+      },
+      "paper_small_topology_d": {
+        "topology_id": "paper_small_topology_d",
+        "family": "direct_heavy",
+        "difficulty": "hard",
+        "crosshaul_latency_limits_ms": [
+          10.0,
+          1.0,
+          0.25,
+          0.25
+        ],
+        "es_rc_delay_range_ms": {
+          "min": 0.9545,
+          "max": 3.475
+        },
+        "direct_rc_delay_range_ms": {
+          "min": 0.136,
+          "max": 0.136
+        },
+        "min_feasible_crosshaul_delay_by_split_ms": {
+          "S1": 0.9545,
+          "S2": 0.9545,
+          "S3": 0.9545,
+          "S4": 0.136
+        },
+        "direct_rh_rc_fraction": 0.125,
+        "split_structurally_available": {
+          "S1": true,
+          "S2": true,
+          "S3": true,
+          "S4": true
+        },
+        "split_latency_feasibility": {
+          "S1": {
+            "mode": "es_rc",
+            "limit_ms": 10.0,
+            "compatible_edge_count": 6,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.9545,
+            "max_delay_ms": 3.475,
+            "strictly_possible_from_link_delay": true
+          },
+          "S2": {
+            "mode": "es_rc",
+            "limit_ms": 1.0,
+            "compatible_edge_count": 1,
+            "compatible_edge_fraction": 0.16666666666666666,
+            "min_delay_ms": 0.9545,
+            "max_delay_ms": 3.475,
+            "strictly_possible_from_link_delay": true
+          },
+          "S3": {
+            "mode": "es_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": 0.9545,
+            "max_delay_ms": 3.475,
+            "strictly_possible_from_link_delay": false
+          },
+          "S4": {
+            "mode": "direct_rh_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 1,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.136,
+            "max_delay_ms": 0.136,
+            "strictly_possible_from_link_delay": true
+          }
+        },
+        "splits_ruled_out_by_link_delay": [
+          "S3"
+        ]
+      },
+      "paper_small_topology_e": {
+        "topology_id": "paper_small_topology_e",
+        "family": "balanced",
+        "difficulty": "moderate",
+        "crosshaul_latency_limits_ms": [
+          10.0,
+          1.0,
+          0.25,
+          0.25
+        ],
+        "es_rc_delay_range_ms": {
+          "min": 0.334,
+          "max": 3.0943
+        },
+        "direct_rc_delay_range_ms": {
+          "min": 0.1871,
+          "max": 0.2191
+        },
+        "min_feasible_crosshaul_delay_by_split_ms": {
+          "S1": 0.334,
+          "S2": 0.334,
+          "S3": 0.334,
+          "S4": 0.1871
+        },
+        "direct_rh_rc_fraction": 0.25,
+        "split_structurally_available": {
+          "S1": true,
+          "S2": true,
+          "S3": true,
+          "S4": true
+        },
+        "split_latency_feasibility": {
+          "S1": {
+            "mode": "es_rc",
+            "limit_ms": 10.0,
+            "compatible_edge_count": 6,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.334,
+            "max_delay_ms": 3.0943,
+            "strictly_possible_from_link_delay": true
+          },
+          "S2": {
+            "mode": "es_rc",
+            "limit_ms": 1.0,
+            "compatible_edge_count": 3,
+            "compatible_edge_fraction": 0.5,
+            "min_delay_ms": 0.334,
+            "max_delay_ms": 3.0943,
+            "strictly_possible_from_link_delay": true
+          },
+          "S3": {
+            "mode": "es_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": 0.334,
+            "max_delay_ms": 3.0943,
+            "strictly_possible_from_link_delay": false
+          },
+          "S4": {
+            "mode": "direct_rh_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 2,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.1871,
+            "max_delay_ms": 0.2191,
+            "strictly_possible_from_link_delay": true
+          }
+        },
+        "splits_ruled_out_by_link_delay": [
+          "S3"
+        ]
+      }
+    }
+  },
+  "episode_rewards": [
+    0.3990304640418462
+  ],
+  "episode_costs": [
+    55.351844787597656
+  ],
+  "valid_deployments": [
+    1.0
+  ],
+  "episode_valid_time_slot_rates": [
+    1.0
+  ],
+  "episode_topology_ids": [
+    "paper_small_topology_a"
+  ],
+  "episode_topology_pools": [
+    "train"
+  ],
+  "episode_has_structurally_valid_action": [
+    true
+  ],
+  "episode_has_strictly_valid_action": [
+    false
+  ],
+  "episode_has_greedy_strictly_valid_action": [
+    false
+  ],
+  "episode_has_exact_strictly_valid_action": [
+    false
+  ],
+  "episode_bounded_strict_feasibility_probe": [
+    {
+      "result": false,
+      "rhs_considered": 8,
+      "visit_limit": 50000,
+      "is_full_instance": true,
+      "is_exact": true,
+      "status": "exact"
+    }
+  ],
+  "episode_failure_counts": [
+    {
+      "missing_direct_rc_link": 0,
+      "missing_rh_es_link": 0,
+      "missing_es_rc_link": 0,
+      "es_capacity_exceeded": 0,
+      "rc_capacity_exceeded": 0,
+      "bandwidth_exceeded": 0,
+      "e2e_latency_exceeded": 0,
+      "crosshaul_latency_exceeded": 0
+    }
+  ],
+  "episode_cost_breakdowns": [
+    {
+      "processing_cost": 74.95019912719727,
+      "routing_cost": 3.8206388289978728,
+      "reconfiguration_cost": 9.0,
+      "sla_penalty": 22.932856559753418,
+      "es_overuse": 0.0,
+      "rc_overuse": 0.0,
+      "bandwidth_overuse": 0.0,
+      "e2e_violation": 8.03405668334961,
+      "crosshaul_violation": 14.898800373077393
+    }
+  ],
+  "episode_reconfiguration_stats": [
+    {
+      "split_changes": 3.0,
+      "es_changes": 2.0,
+      "rc_changes": 4.0,
+      "total_reconfiguration_changes": 9.0,
+      "time_slot_count": 2,
+      "time_slot_transitions": 1,
+      "avg_split_changes_per_transition": 3.0,
+      "avg_es_changes_per_transition": 2.0,
+      "avg_rc_changes_per_transition": 4.0,
+      "avg_total_reconfiguration_changes_per_transition": 9.0,
+      "reconfiguration_cost_pct_of_total_cost": 6.734684406403389
+    }
+  ],
+  "episode_split_usage": [
+    {
+      "S1": 1,
+      "S2": 9,
+      "S3": 4,
+      "S4": 2
+    }
+  ],
+  "training_summary": {
+    "timing_profile_seconds": {
+      "total_seconds": 0.1040028870338574,
+      "reset_seconds": 0.0011488939635455608,
+      "adjacency_seconds": 9.722501272335649e-05,
+      "graph_build_seconds": 0.0003814010415226221,
+      "gnn_forward_seconds": 0.002924828033428639,
+      "action_selection_seconds": 0.0023228820064105093,
+      "env_step_seconds": 0.0005097569664940238,
+      "store_transition_seconds": 5.967897595837712e-05,
+      "ppo_update_seconds": 0.04274497501319274,
+      "results_write_seconds": 0.0,
+      "checkpoint_save_seconds": 0.0,
+      "evaluation_seconds": 0.0,
+      "comparison_seconds": 0.0
+    },
+    "total_timesteps_collected": 2,
+    "parallel_envs": 1,
+    "split_usage": {
+      "S1": 1,
+      "S2": 9,
+      "S3": 4,
+      "S4": 2
+    },
+    "avg_cost_breakdown_per_episode": {
+      "processing_cost": 74.95019912719727,
+      "routing_cost": 3.8206388289978728,
+      "reconfiguration_cost": 9.0,
+      "sla_penalty": 22.932856559753418,
+      "es_overuse": 0.0,
+      "rc_overuse": 0.0,
+      "bandwidth_overuse": 0.0,
+      "e2e_violation": 8.03405668334961,
+      "crosshaul_violation": 14.898800373077393
+    },
+    "avg_reconfiguration_stats_per_episode": {
+      "split_changes": 3.0,
+      "es_changes": 2.0,
+      "rc_changes": 4.0,
+      "total_reconfiguration_changes": 9.0,
+      "avg_split_changes_per_transition": 3.0,
+      "avg_es_changes_per_transition": 2.0,
+      "avg_rc_changes_per_transition": 4.0,
+      "avg_total_reconfiguration_changes_per_transition": 9.0,
+      "reconfiguration_cost_pct_of_total_cost": 6.734684406403389
+    },
+    "invalid_counts_by_reason": {
+      "missing_direct_rc_link": 0,
+      "missing_rh_es_link": 0,
+      "missing_es_rc_link": 0,
+      "es_capacity_exceeded": 0,
+      "rc_capacity_exceeded": 0,
+      "bandwidth_exceeded": 0,
+      "e2e_latency_exceeded": 0,
+      "crosshaul_latency_exceeded": 0
+    },
+    "strict_feasible_reset_rate": 0.0,
+    "exact_strict_feasible_reset_rate": 0.0,
+    "strict_feasibility_reporting": {
+      "rate_label": "Strict-Feasible Reset Rate",
+      "no_action_label": "Episodes With No Strict-Valid Action",
+      "status": "exact_supported"
+    },
+    "bounded_strict_probe_summary": {
+      "positive_rate": 0.0,
+      "negative_rate": 1.0,
+      "inconclusive_rate": 0.0
+    },
+    "episodes_with_no_strict_valid_action_rate": 1.0,
+    "invalid_reason_percentages": {
+      "missing_direct_rc_link": 0.0,
+      "missing_rh_es_link": 0.0,
+      "missing_es_rc_link": 0.0,
+      "es_capacity_exceeded": 0.0,
+      "rc_capacity_exceeded": 0.0,
+      "bandwidth_exceeded": 0.0,
+      "e2e_latency_exceeded": 0.0,
+      "crosshaul_latency_exceeded": 0.0
+    }
+  },
+  "strict_mode_debug": {
+    "first_failure_traces": [],
+    "per_topology": {
+      "paper_small_topology_a": {
+        "strict_feasible_reset_rate": 0.0,
+        "exact_strict_feasible_reset_count": 0,
+        "valid_time_slot_rate": 1.0,
+        "avg_invalid_reasons_per_time_slot": 0.0,
+        "invalid_counts_by_reason": {
+          "missing_direct_rc_link": 0,
+          "missing_rh_es_link": 0,
+          "missing_es_rc_link": 0,
+          "es_capacity_exceeded": 0,
+          "rc_capacity_exceeded": 0,
+          "bandwidth_exceeded": 0,
+          "e2e_latency_exceeded": 0,
+          "crosshaul_latency_exceeded": 0
+        },
+        "invalid_reason_percentages": {
+          "missing_direct_rc_link": 0.0,
+          "missing_rh_es_link": 0.0,
+          "missing_es_rc_link": 0.0,
+          "es_capacity_exceeded": 0.0,
+          "rc_capacity_exceeded": 0.0,
+          "bandwidth_exceeded": 0.0,
+          "e2e_latency_exceeded": 0.0,
+          "crosshaul_latency_exceeded": 0.0
+        },
+        "first_failing_constraint_counts": {},
+        "bounded_probe_results": [
+          {
+            "result": false,
+            "rhs_considered": 8,
+            "visit_limit": 50000,
+            "is_full_instance": true,
+            "is_exact": true,
+            "status": "exact"
+          }
+        ],
+        "bounded_probe_summary": {
+          "positive_rate": 0.0,
+          "negative_rate": 1.0,
+          "inconclusive_rate": 0.0
+        }
+      }
+    },
+    "topology_latency_diagnostics": {
+      "paper_small_topology_a": {
+        "topology_id": "paper_small_topology_a",
+        "family": "balanced",
+        "difficulty": "moderate",
+        "crosshaul_latency_limits_ms": [
+          10.0,
+          1.0,
+          0.25,
+          0.25
+        ],
+        "es_rc_delay_range_ms": {
+          "min": 0.7889,
+          "max": 3.1521
+        },
+        "direct_rc_delay_range_ms": {
+          "min": 0.2172,
+          "max": 0.2172
+        },
+        "min_feasible_crosshaul_delay_by_split_ms": {
+          "S1": 0.7889,
+          "S2": 0.7889,
+          "S3": 0.7889,
+          "S4": 0.2172
+        },
+        "direct_rh_rc_fraction": 0.125,
+        "split_structurally_available": {
+          "S1": true,
+          "S2": true,
+          "S3": true,
+          "S4": true
+        },
+        "split_latency_feasibility": {
+          "S1": {
+            "mode": "es_rc",
+            "limit_ms": 10.0,
+            "compatible_edge_count": 6,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.7889,
+            "max_delay_ms": 3.1521,
+            "strictly_possible_from_link_delay": true
+          },
+          "S2": {
+            "mode": "es_rc",
+            "limit_ms": 1.0,
+            "compatible_edge_count": 1,
+            "compatible_edge_fraction": 0.16666666666666666,
+            "min_delay_ms": 0.7889,
+            "max_delay_ms": 3.1521,
+            "strictly_possible_from_link_delay": true
+          },
+          "S3": {
+            "mode": "es_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 0,
+            "compatible_edge_fraction": 0.0,
+            "min_delay_ms": 0.7889,
+            "max_delay_ms": 3.1521,
+            "strictly_possible_from_link_delay": false
+          },
+          "S4": {
+            "mode": "direct_rh_rc",
+            "limit_ms": 0.25,
+            "compatible_edge_count": 1,
+            "compatible_edge_fraction": 1.0,
+            "min_delay_ms": 0.2172,
+            "max_delay_ms": 0.2172,
+            "strictly_possible_from_link_delay": true
+          }
+        },
+        "splits_ruled_out_by_link_delay": [
+          "S3"
+        ]
+      }
+    }
+  },
+  "gnn_training_verification": {
+    "gnn_state_dict_saved": true,
+    "initial_param_l2_norm": 73.26354747128194,
+    "final_param_l2_norm": 73.26384246466722,
+    "parameter_delta_l2_norm": 0.2945269409687309
+  },
+  "paper_mode_seed_index": 0,
+  "csv_exports": {
+    "training_episode_metrics": "outputs/paper_runs/training_episode_metrics.csv",
+    "invalid_reason_summary": "outputs/paper_runs/invalid_reason_summary.csv",
+    "timing_profile": "outputs/paper_runs/timing_profile.csv"
+  }
+}
