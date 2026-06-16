@@ -1,0 +1,22 @@
+{
+  "total_candidate_handovers": 38837,
+  "valid_candidate_handovers": 38837,
+  "handover_count_by_scenario": {
+    "rome_slow_close": 7895,
+    "rome_static_close": 27,
+    "rome_static_far": 30911,
+    "rome_static_medium": 4
+  },
+  "handover_count_by_confidence": {
+    "high": 38531,
+    "medium": 306
+  },
+  "dominant_rh_pairs": {
+    "('bs3', 'bs2')": 13698,
+    "('bs2', 'bs3')": 13615,
+    "('bs1', 'bs3')": 5432,
+    "('bs3', 'bs1')": 5431,
+    "('bs2', 'bs1')": 335,
+    "('bs1', 'bs2')": 326
+  }
+}
