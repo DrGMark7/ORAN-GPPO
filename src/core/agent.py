@@ -321,7 +321,7 @@ class PPOAgent:
                 ratio = torch.exp(new_log_probs - batch_old_log_probs)
                 surr1 = ratio * batch_advantages
                 surr2 = torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio) * batch_advantages
-                policy_loss = -torch.min(surr1, surr2).mean()
+                policy_loss = -torch.min(surr1, surr2).mean() #! -1 for Optimizer try to force Policy can not do this action, but we want to maximize the advantage. So we minimize the negative of the surrogate objective.
                 value_loss = F.mse_loss(values, batch_returns)
                 loss = policy_loss + 0.5 * value_loss - 1e-6 * entropy
 
